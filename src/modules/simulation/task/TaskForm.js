@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Col, Row, Button, Input, Space, Modal, Divider, Tag, Collapse } from 'antd';
+import { Card, Col, Row, Button, Input, Space, Modal, Divider, Tag, Collapse, Alert } from 'antd';
 import { PlusOutlined, MinusCircleOutlined, EyeOutlined, BookOutlined } from '@ant-design/icons';
+import { useLocation } from 'react-router-dom';
 
 import { BaseForm } from '@components/common/form/BaseForm';
 import CropImageField from '@components/common/form/CropImageField';
-import SelectField from '@components/common/form/SelectField';
 import TextField from '@components/common/form/TextField';
 import NumericField from '@components/common/form/NumericField';
 
@@ -12,11 +12,10 @@ import useBasicForm from '@hooks/useBasicForm';
 import useFetch from '@hooks/useFetch';
 import useTranslate from '@hooks/useTranslate';
 
-import { AppConstants, TaskTypes, storageKeys } from '@constants';
+import { AppConstants, TaskTypes } from '@constants';
 import apiConfig from '@constants/apiConfig';
 import { taskKindOptions } from '@constants/masterData';
 import { commonMessage } from '@locales/intl';
-import { getData } from '@utils/localStorage';
 
 const { TextArea } = Input;
 const { Panel } = Collapse;
@@ -24,6 +23,10 @@ const { Panel } = Collapse;
 const TaskForm = (props) => {
     const translate = useTranslate();
     const kindValues = translate.formatKeys(taskKindOptions, ['label']);
+    const location = useLocation();
+    
+    // Lấy parentTask từ location.state
+    const parentTaskFromState = location.state?.parentTask;
 
     const {
         formId,
@@ -36,13 +39,16 @@ const TaskForm = (props) => {
     } = props;
 
     const { execute: executeUpFile } = useFetch(apiConfig.file.upload);
+    const { execute: getTaskList } = useFetch(apiConfig.task.getList);
+    
     const [imagePath, setImagePath] = useState(null);
     const [videoPath, setVideoPath] = useState(null);
     const [filePath, setFilePath] = useState(null);
-    const [selectedKind, setSelectedKind] = useState(null);
+    const [taskKind, setTaskKind] = useState(null);
     const [previewVisible, setPreviewVisible] = useState(false);
+    const [parentTaskInfo, setParentTaskInfo] = useState(null);
+    const [autoNameGenerated, setAutoNameGenerated] = useState(false);
 
-    // State cho Introduction (array of objects)
     const [introductionSections, setIntroductionSections] = useState([
         { title: '', content: '' },
     ]);
@@ -51,6 +57,72 @@ const TaskForm = (props) => {
         onSubmit,
         setIsChangedFormValues,
     });
+
+    // Xác định loại task và parent info từ location.state hoặc dataDetail
+    useEffect(() => {
+        console.log('Parent Info from location.state:', parentTaskFromState);
+        console.log('Is Editing:', isEditing);
+        console.log('Data Detail:', dataDetail);
+        
+        if (!isEditing) {
+            // Khi tạo mới
+            if (parentTaskFromState) {
+                // Đang tạo SubTask
+                setTaskKind(TaskTypes.SUBTASK);
+                setParentTaskInfo(parentTaskFromState);
+                
+                // Set name ngay lập tức cho SubTask = tên của Task cha
+                setTimeout(() => {
+                    form.setFieldsValue({ name: parentTaskFromState.name });
+                    console.log('Set form name from state:', parentTaskFromState.name);
+                }, 100);
+                setAutoNameGenerated(true);
+            } else {
+                // Đang tạo Task
+                setTaskKind(TaskTypes.TASK);
+                setParentTaskInfo(null);
+            }
+        } else {
+            // Khi edit, lấy thông tin từ dataDetail
+            if (dataDetail?.kind === TaskTypes.SUBTASK && dataDetail?.parent) {
+                setTaskKind(TaskTypes.SUBTASK);
+                setParentTaskInfo(dataDetail.parent);
+            } else if (dataDetail?.kind === TaskTypes.TASK) {
+                setTaskKind(TaskTypes.TASK);
+                setParentTaskInfo(null);
+            }
+        }
+    }, [parentTaskFromState, isEditing, dataDetail]);
+
+    // Generate auto name cho Task (không phải SubTask)
+    const generateAutoName = async () => {
+        if (isEditing || autoNameGenerated || taskKind !== TaskTypes.TASK) return;
+
+        try {
+            const response = await getTaskList({
+                params: {
+                    simulationId: simulationId,
+                },
+            });
+
+            if (response?.data?.data) {
+                const tasks = response.data.data;
+                const taskCount = tasks.filter(t => t.kind === TaskTypes.TASK).length;
+                const autoName = `Nhiệm vụ ${taskCount + 1}`;
+                form.setFieldsValue({ name: autoName });
+                setAutoNameGenerated(true);
+            }
+        } catch (error) {
+            console.error('Error generating auto name:', error);
+        }
+    };
+
+    // Chỉ generate auto name cho Task (kind = 1)
+    useEffect(() => {
+        if (taskKind === TaskTypes.TASK && !isEditing && !autoNameGenerated) {
+            generateAutoName();
+        }
+    }, [taskKind, isEditing, autoNameGenerated]);
 
     const uploadFile = (file, onSuccess, onError, type = 'AVATAR') => {
         executeUpFile({
@@ -68,20 +140,17 @@ const TaskForm = (props) => {
         });
     };
 
-    // Thêm introduction section
     const addIntroductionSection = () => {
         setIntroductionSections([...introductionSections, { title: '', content: '' }]);
         setIsChangedFormValues(true);
     };
 
-    // Xóa introduction section
     const removeIntroductionSection = (index) => {
         const newSections = introductionSections.filter((_, i) => i !== index);
         setIntroductionSections(newSections.length > 0 ? newSections : [{ title: '', content: '' }]);
         setIsChangedFormValues(true);
     };
 
-    // Update introduction section
     const updateIntroductionSection = (index, field, value) => {
         const newSections = [...introductionSections];
         newSections[index][field] = value;
@@ -89,75 +158,54 @@ const TaskForm = (props) => {
         setIsChangedFormValues(true);
     };
 
-    // Helper function để chuẩn hóa introduction data
     const normalizeIntroduction = (sections) => {
-        // Loại bỏ các section rỗng (cả title và content đều rỗng)
         const validSections = sections.filter(
             section => section.title.trim() !== '' || section.content.trim() !== '',
         );
         
-        // Nếu không có section nào valid, trả về array rỗng
-        return validSections.length > 0 ? validSections : [];
+        return validSections;
     };
 
     const handleSubmit = (values) => {
-        // Chuẩn hóa introduction trước khi stringify
         const normalizedIntroduction = normalizeIntroduction(introductionSections);
         
-        // Tạo introduction JSON string (hoặc null nếu rỗng)
         const introductionJson = normalizedIntroduction.length > 0 
             ? JSON.stringify(normalizedIntroduction) 
-            : null;
+            : '';
 
-        // Tạo base submit data
+        let taskName = values.name?.trim() || '';
+        
         let submitData = {
-            name: values.name?.trim() || '',
+            name: taskName,
             title: values.title?.trim() || '',
-            description: values.description?.trim() || null,
-            content: values.content?.trim() || null,
-            kind: values.kind,
+            description: values.description?.trim() || '',
+            content: values.content?.trim() || '',
+            kind: isEditing ? dataDetail.kind : taskKind,
             maxErrors: values.maxErrors || 0,
-            simulationId: simulationId,
+            simulationId: simulationId || 0,
             introduction: introductionJson,
-            imagePath: imagePath || null,
-            videoPath: videoPath || null,
-            filePath: filePath || null,
-            parentId: null, // Default null
+            imagePath: imagePath || '',
+            videoPath: videoPath || '',
+            filePath: filePath || '',
         };
 
-        // Nếu kind = SubTask (2), thêm parentId và điều chỉnh name
-        if (values.kind === TaskTypes.SUBTASK) {
-            const parentTaskInfo = getData(storageKeys.PARENT_TASK_INFO);
-            
-            if (parentTaskInfo && parentTaskInfo.id) {
-                submitData.parentId = parentTaskInfo.id;
-                // Chỉ thêm prefix nếu chưa có
-                if (!submitData.name.startsWith(parentTaskInfo.name)) {
-                    submitData.name = `${parentTaskInfo.name} - ${submitData.name}`;
-                }
+        // Thêm parentId nếu là SubTask
+        if (submitData.kind === TaskTypes.SUBTASK) {
+            if (parentTaskInfo) {
+                submitData.parentId = parseInt(parentTaskInfo.id);
+            } else if (dataDetail?.parent?.id) {
+                submitData.parentId = dataDetail.parent.id;
             }
         }
 
-        // Log để debug (có thể xóa trong production)
         console.log('Submit Data:', JSON.stringify(submitData, null, 2));
 
         return mixinFuncs.handleSubmit(submitData);
     };
 
-    // Handle khi thay đổi kind
-    const handleKindChange = (value) => {
-        setSelectedKind(value);
-        
-        // Reset parentId khi chuyển sang Task thường
-        if (value === TaskTypes.TASK) {
-            form.setFieldsValue({ parentId: null });
-        }
-    };
-
-    // Get preview data
     const getPreviewData = () => {
         const formValues = form.getFieldsValue();
-        const parentTaskInfo = getData(storageKeys.PARENT_TASK_INFO);
+        const currentKind = isEditing ? dataDetail.kind : taskKind;
         
         return {
             ...formValues,
@@ -165,12 +213,13 @@ const TaskForm = (props) => {
             videoPath,
             filePath,
             introduction: normalizeIntroduction(introductionSections),
-            kind: kindValues.find(k => k.value === formValues.kind),
-            parentTask: selectedKind === TaskTypes.SUBTASK ? parentTaskInfo : null,
+            kind: kindValues.find(k => k.value === currentKind),
+            parentTask: (taskKind === TaskTypes.SUBTASK || dataDetail?.kind === TaskTypes.SUBTASK) 
+                ? parentTaskInfo 
+                : null,
         };
     };
 
-    // Parse introduction an toàn hơn
     const parseIntroduction = (introData) => {
         if (!introData) return [{ title: '', content: '' }];
         
@@ -179,13 +228,11 @@ const TaskForm = (props) => {
                 ? JSON.parse(introData) 
                 : introData;
             
-            // Validate structure
             if (!Array.isArray(parsed)) {
                 console.warn('Introduction is not an array');
                 return [{ title: '', content: '' }];
             }
             
-            // Filter và validate các phần tử
             const validParsed = parsed.filter(
                 item => item && typeof item === 'object' && 'title' in item && 'content' in item,
             );
@@ -198,55 +245,59 @@ const TaskForm = (props) => {
     };
 
     useEffect(() => {
-        if (dataDetail) {
+        if (dataDetail && Object.keys(dataDetail).length > 0) {
             form.setFieldsValue({
                 name: dataDetail?.name || '',
                 title: dataDetail?.title || '',
                 description: dataDetail?.description || '',
                 content: dataDetail?.content || '',
-                kind: dataDetail?.kind,
                 maxErrors: dataDetail?.maxErrors || 0,
-                parentId: dataDetail?.parentId || null,
             });
             
-            setImagePath(dataDetail?.imagePath || null);
-            setVideoPath(dataDetail?.videoPath || null);
-            setFilePath(dataDetail?.filePath || null);
-            setSelectedKind(dataDetail?.kind);
+            setImagePath(dataDetail?.imagePath || '');
+            setVideoPath(dataDetail?.videoPath || '');
+            setFilePath(dataDetail?.filePath || '');
+            setAutoNameGenerated(true);
 
-            // Parse introduction
             const parsedIntro = parseIntroduction(dataDetail?.introduction);
             setIntroductionSections(parsedIntro);
         }
     }, [dataDetail]);
 
+    const getCurrentKindLabel = () => {
+        const currentKind = isEditing ? dataDetail.kind : taskKind;
+        const kindOption = kindValues.find(k => k.value === currentKind);
+        return kindOption?.label || 'Task';
+    };
+
     return (
         <>
             <BaseForm id={formId} onFinish={handleSubmit} form={form} onValuesChange={onValuesChange}>
                 <Card className="card-form" bordered={false}>
-                    {/* Hiển thị thông tin Parent Task nếu đang tạo SubTask */}
-                    {selectedKind === TaskTypes.SUBTASK && (() => {
-                        const parentTaskInfo = getData(storageKeys.PARENT_TASK_INFO);
-                        if (parentTaskInfo) {
-                            return (
-                                <Row gutter={16} style={{ marginBottom: 16 }}>
-                                    <Col span={24}>
-                                        <div style={{
-                                            padding: '12px',
-                                            background: '#e6f7ff',
-                                            border: '1px solid #91d5ff',
-                                            borderRadius: '4px',
-                                        }}>
-                                            <strong>Parent Task:</strong> {parentTaskInfo.name}
-                                        </div>
-                                    </Col>
-                                </Row>
-                            );
-                        }
-                        return null;
-                    })()}
+                    <Row gutter={16} style={{ marginBottom: 16 }}>
+                        <Col span={24}>
+                            <Alert
+                                message={
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <strong>Loại:</strong>
+                                        <Tag color={taskKind === TaskTypes.TASK ? 'blue' : 'purple'}>
+                                            {getCurrentKindLabel()}
+                                        </Tag>
+                                        {parentTaskInfo && taskKind === TaskTypes.SUBTASK && (
+                                            <>
+                                                <span>•</span>
+                                                <span>Thuộc Task: <strong>{parentTaskInfo.name}</strong></span>
+                                            </>
+                                        )}
+                                    </div>
+                                }
+                                type="info"
+                                showIcon
+                                icon={<BookOutlined />}
+                            />
+                        </Col>
+                    </Row>
 
-                    {/* Basic Info */}
                     <Row gutter={16}>
                         <Col span={12}>
                             <TextField
@@ -255,10 +306,11 @@ const TaskForm = (props) => {
                                 name="name"
                                 requiredMsg={translate.formatMessage(commonMessage.required)}
                                 placeholder={
-                                    selectedKind === TaskTypes.SUBTASK 
-                                        ? "Tên SubTask (sẽ tự động thêm prefix parent task)"
-                                        : "Tên Task"
+                                    taskKind === TaskTypes.SUBTASK
+                                        ? "Tự động điền theo tên Task cha"
+                                        : "Tự động điền: Nhiệm vụ 1, 2, 3..."
                                 }
+                                disabled={taskKind === TaskTypes.SUBTASK}
                             />
                         </Col>
                         <Col span={12}>
@@ -267,28 +319,19 @@ const TaskForm = (props) => {
                                 required
                                 name="title"
                                 requiredMsg={translate.formatMessage(commonMessage.required)}
+                                placeholder="Tiêu đề nhiệm vụ"
                             />
                         </Col>
                     </Row>
 
                     <Row gutter={16}>
-                        <Col span={12}>
-                            <SelectField
-                                label={translate.formatMessage(commonMessage.kind)}
-                                required
-                                name="kind"
-                                requiredMsg={translate.formatMessage(commonMessage.required)}
-                                options={kindValues}
-                                allowClear={false}
-                                onChange={handleKindChange}
-                            />
-                        </Col>
-                        <Col span={12}>
+                        <Col span={24}>
                             <NumericField
-                                label={translate.formatMessage(commonMessage.maxErrors)}
+                                label="Số lỗi tối đa"
                                 name="maxErrors"
                                 min={0}
                                 max={100}
+                                placeholder="0"
                             />
                         </Col>
                     </Row>
@@ -296,18 +339,30 @@ const TaskForm = (props) => {
                     <Row gutter={16}>
                         <Col span={24}>
                             <TextField
-                                label={translate.formatMessage(commonMessage.description)}
+                                label="Mô tả"
                                 required
                                 name="description"
                                 type="textarea"
                                 rows={3}
+                                placeholder="Mô tả ngắn gọn về nhiệm vụ"
+                            />
+                        </Col>
+                    </Row>
+
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <TextField
+                                label="Nội dung chi tiết"
+                                name="content"
+                                type="textarea"
+                                rows={5}
+                                placeholder="Nhập nội dung chi tiết của nhiệm vụ (tùy chọn)"
                             />
                         </Col>
                     </Row>
 
                     <Divider orientation="left">Giới thiệu bài học</Divider>
 
-                    {/* Introduction Sections */}
                     {introductionSections.map((section, index) => (
                         <Card
                             key={index}
@@ -376,11 +431,10 @@ const TaskForm = (props) => {
 
                     <Divider orientation="left">Media & Files</Divider>
 
-                    {/* Media */}
                     <Row gutter={16}>
                         <Col span={8}>
                             <CropImageField
-                                label={translate.formatMessage(commonMessage.image)}
+                                label="Hình ảnh"
                                 name="imagePath"
                                 imageUrl={imagePath && `${AppConstants.contentRootUrl}${imagePath}`}
                                 aspect={16 / 9}
@@ -392,6 +446,7 @@ const TaskForm = (props) => {
                                 label="Video URL"
                                 name="videoPathInput"
                                 placeholder="URL video"
+                                value={videoPath}
                                 onChange={(e) => {
                                     setVideoPath(e.target.value);
                                     setIsChangedFormValues(true);
@@ -403,6 +458,7 @@ const TaskForm = (props) => {
                                 label="File URL"
                                 name="filePathInput"
                                 placeholder="URL file"
+                                value={filePath}
                                 onChange={(e) => {
                                     setFilePath(e.target.value);
                                     setIsChangedFormValues(true);
@@ -425,7 +481,6 @@ const TaskForm = (props) => {
                 </Card>
             </BaseForm>
 
-            {/* Preview Modal */}
             <TaskPreviewModal
                 visible={previewVisible}
                 onClose={() => setPreviewVisible(false)}
@@ -435,7 +490,6 @@ const TaskForm = (props) => {
     );
 };
 
-// Component Preview Modal - Giống trang làm bài của học viên
 const TaskPreviewModal = ({ visible, onClose, data }) => {
     const formatContent = (content) => {
         if (!content) return null;
@@ -478,7 +532,6 @@ const TaskPreviewModal = ({ visible, onClose, data }) => {
                 padding: '24px',
                 background: '#f5f5f5',
             }}>
-                {/* Header như trang học của học viên */}
                 <div style={{ 
                     background: 'white', 
                     padding: '24px', 
@@ -486,7 +539,6 @@ const TaskPreviewModal = ({ visible, onClose, data }) => {
                     marginBottom: '16px',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                 }}>
-                    {/* Parent Task Info */}
                     {data.parentTask && (
                         <div style={{ 
                             marginBottom: '16px',
@@ -499,7 +551,6 @@ const TaskPreviewModal = ({ visible, onClose, data }) => {
                         </div>
                     )}
 
-                    {/* Title và Kind */}
                     <div style={{ marginBottom: '16px' }}>
                         <h2 style={{ margin: 0, marginBottom: '8px' }}>
                             {data.title || 'Chưa có tiêu đề'}
@@ -518,7 +569,6 @@ const TaskPreviewModal = ({ visible, onClose, data }) => {
                         </Space>
                     </div>
 
-                    {/* Image */}
                     {data.imagePath && (
                         <img
                             src={`${AppConstants.contentRootUrl}${data.imagePath}`}
@@ -533,7 +583,6 @@ const TaskPreviewModal = ({ visible, onClose, data }) => {
                         />
                     )}
 
-                    {/* Description */}
                     {data.description && (
                         <div style={{ 
                             padding: '16px',
@@ -547,7 +596,6 @@ const TaskPreviewModal = ({ visible, onClose, data }) => {
                     )}
                 </div>
 
-                {/* Introduction Sections - Collapse như bài học thật */}
                 {data.introduction && data.introduction.length > 0 && (
                     <Collapse 
                         defaultActiveKey={['0']}
@@ -577,7 +625,6 @@ const TaskPreviewModal = ({ visible, onClose, data }) => {
                     </Collapse>
                 )}
 
-                {/* Media Links */}
                 {(data.videoPath || data.filePath) && (
                     <div style={{ 
                         background: 'white', 
@@ -601,7 +648,6 @@ const TaskPreviewModal = ({ visible, onClose, data }) => {
                     </div>
                 )}
 
-                {/* Nút bắt đầu làm bài - giống giao diện thật */}
                 <div style={{ 
                     marginTop: '24px',
                     padding: '24px',

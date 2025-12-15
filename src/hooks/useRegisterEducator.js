@@ -12,16 +12,23 @@ const useRegisterEducator = () => {
             method: 'POST',
             data: payload,
             onCompleted: (res) => {
+                // Kiểm tra result từ API
                 if (res?.result === true) {
+                    // Thành công
                     message.success(res.message || 'Đăng ký thành công');
                     onSuccess?.(res);
                 } else {
+                    // Thất bại - API trả về result: false
                     message.error(res.message || 'Đăng ký thất bại');
                     onError?.(res);
                 }
             },
             onError: (err) => {
-                message.error(err?.message || 'Lỗi không xác định');
+                // Lỗi network hoặc lỗi khác
+                const errorMessage = err?.response?.data?.message 
+                    || err?.message 
+                    || 'Lỗi không xác định';
+                message.error(errorMessage);
                 onError?.(err);
             },
         });

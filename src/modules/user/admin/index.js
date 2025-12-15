@@ -11,7 +11,7 @@ import ListPage from '@components/common/layout/ListPage';
 import PageWrapper from '@components/common/layout/PageWrapper';
 
 import { UserOutlined } from '@ant-design/icons';
-import { Empty } from 'antd';
+import { Empty, Tag } from 'antd';
 import { calculateIndex, getColumnWidth } from '@utils';
 import { FieldTypes } from '@constants/formConfig';
 
@@ -25,23 +25,6 @@ const AdminListPage = ({ pageOptions }) => {
         update: apiConfig.account.updateAdmin,
     };
 
-    // const { data, mixinFuncs, queryFilter, loading, pagination } = useListBase({
-    //     apiConfig: apiConfiguration,
-    //     options: {
-    //         pageSize: DEFAULT_TABLE_ITEM_SIZE,
-    //         objectName: translate
-    //             .formatMessage(pageOptions.objectName)
-    //             ?.toLowerCase(),
-    //     },
-    //     override: (funcs) => {
-    //         funcs.mappingData = (data) => {
-    //             if (Array.isArray(data?.content)) return data.content;
-    //             if (Array.isArray(data)) return data;
-    //             return [];
-    //         };
-    //     },
-    // });
-
     const { data, mixinFuncs, queryFilter, loading, pagination } = useListBase({
         apiConfig: apiConfiguration,
         options: {
@@ -49,6 +32,32 @@ const AdminListPage = ({ pageOptions }) => {
             objectName: translate
                 .formatMessage(pageOptions.objectName)
                 ?.toLowerCase(),
+        },
+        override: (funcs) => {
+            const statusMap = {
+                1: { label: translate.formatMessage(commonMessage.statusActive), color: '#00A648' },
+                2: { label: translate.formatMessage(commonMessage.statusPending), color: '#FFBF00' },
+                3: { label: translate.formatMessage(commonMessage.statusLock), color: '#CC0000' },
+            };
+
+            // ⚠️ Lưu lại hàm gốc tránh đệ quy vô hạn
+            const originalActionColumnButtons = funcs.actionColumnButtons;
+
+            // ✅ Ghi đè hàm renderStatusColumn
+            funcs.renderStatusColumn = (columnsProps) => ({
+                title: translate.formatMessage(commonMessage.status),
+                dataIndex: 'status',
+                align: 'center',
+                ...columnsProps,
+                render: (status) => {
+                    const item = statusMap[status] || {};
+                    return (
+                        <Tag color={item.color}>
+                            <div style={{ padding: '0 4px', fontSize: 14 }}>{item.label}</div>
+                        </Tag>
+                    );
+                },
+            });
         },
     });
 
@@ -107,6 +116,7 @@ const AdminListPage = ({ pageOptions }) => {
             dataIndex: 'phone',
             width: translate.formatMessage(commonMessage.phone).length * 10,
         },
+        mixinFuncs.renderStatusColumn({ width: '120px' }),
         mixinFuncs.renderActionColumn(
             {
                 edit: mixinFuncs.hasPermission([

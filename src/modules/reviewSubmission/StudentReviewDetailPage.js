@@ -15,6 +15,7 @@ import apiConfig from '@constants/apiConfig';
 import { AppConstants } from '@constants';
 import { commonMessage } from '@locales/intl';
 import useNotification from '@hooks/useNotification';
+import { questionTypeOptions } from '@constants/masterData';
 
 const { Panel } = Collapse;
 
@@ -25,8 +26,24 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
     const { simulationId, username } = useParams();
     const [reviewId, setReviewId] = useState(null);
     const [studentInfo, setStudentInfo] = useState(null);
+    const [taskQuestions, setTaskQuestions] = useState({});
 
     const { form } = useBasicForm();
+    
+    // Dịch questionType options
+    const questionTypeValues = translate.formatKeys(questionTypeOptions, ['label']);
+
+    // helper: parse "introduction" which might be a JSON string or already an object/array
+    const parseIntroduction = (introduction) => {
+        if (!introduction) return null;
+        try {
+            const parsed = typeof introduction === 'string' ? JSON.parse(introduction) : introduction;
+            if (Array.isArray(parsed)) return parsed;
+            return [parsed];
+        } catch (e) {
+            return [{ title: null, content: String(introduction) }];
+        }
+    };
 
     // Fetch danh sách Task/SubTask
     const { data: tasks, loading: loadingTasks } = useFetch(apiConfig.task.educatorList, {
@@ -52,6 +69,14 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
             immediate: true,
             pathParams: { simulationId, username },
             mappingData: (res) => res.data,
+        },
+    );
+
+    // Fetch task questions - sẽ gọi cho từng task
+    const { execute: fetchTaskQuestions, loading: loadingQuestions } = useFetch(
+        apiConfig.taskQuestion.educatorList,
+        {
+            immediate: false,
         },
     );
 
@@ -87,23 +112,77 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
         }
     }, [answers, username]);
 
-    // Nhóm câu trả lời theo Task ID
-    const groupedAnswersByTask = {};
+    // Fetch questions cho tất cả tasks và subtasks khi tasks được load
+    useEffect(() => {
+        if (tasks && tasks.length > 0 && simulationId) {
+            // Lấy tất cả task IDs (bao gồm cả main tasks và subtasks)
+            const allTaskIds = tasks.map(t => t.id);
+            
+            allTaskIds.forEach(taskId => {
+                fetchTaskQuestions({
+                    params: { simulationId, taskId },
+                    onCompleted: (response) => {
+                        const questions = response.data?.content || [];
+                        setTaskQuestions(prev => ({
+                            ...prev,
+                            [taskId]: questions,
+                        }));
+                    },
+                    onError: (error) => {
+                        console.error(`Error fetching questions for task ${taskId}:`, error);
+                    },
+                });
+            });
+        }
+    }, [tasks, simulationId]);
+
+    // Tạo map để tra cứu nhanh câu trả lời theo taskQuestion.id
+    const answerMap = {};
     answers?.forEach(answer => {
-        const taskId = answer.taskQuestion?.task?.id;
-        if (taskId) {
-            if (!groupedAnswersByTask[taskId]) {
-                groupedAnswersByTask[taskId] = [];
-            }
-            groupedAnswersByTask[taskId].push(answer);
+        if (answer.taskQuestion?.id) {
+            answerMap[answer.taskQuestion.id] = answer;
         }
     });
 
-    // Tính toán thống kê cho mỗi task
+    // Tìm câu trả lời của student cho một question cụ thể
+    const getAnswerForQuestion = (questionId) => {
+        return answerMap[questionId] || null;
+    };
+
+    // Parse options từ string JSON
+    const parseOptions = (optionsStr) => {
+        if (!optionsStr) return [];
+        try {
+            const parsed = typeof optionsStr === 'string' ? JSON.parse(optionsStr) : optionsStr;
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    };
+    
+    // Hàm lấy label đã dịch cho questionType
+    const getQuestionTypeLabel = (questionType) => {
+        if (!questionType) return null;
+        const found = questionTypeValues.find(opt => opt.value === questionType);
+        return found ? found.label : questionType;
+    };
+
+    // Tính toán thống kê cho mỗi task dựa trên questions
     const getTaskStats = (taskId) => {
-        const taskAnswers = groupedAnswersByTask[taskId] || [];
-        const correctCount = taskAnswers.filter(a => a.isCorrect).length;
-        const totalCount = taskAnswers.length;
+        const questions = taskQuestions[taskId] || [];
+        let correctCount = 0;
+        let totalCount = 0;
+
+        questions.forEach(question => {
+            const answer = getAnswerForQuestion(question.id);
+            if (answer) {
+                totalCount++;
+                if (answer.isCorrect) {
+                    correctCount++;
+                }
+            }
+        });
+
         const percentage = totalCount > 0 ? ((correctCount / totalCount) * 100).toFixed(1) : 0;
         return { correctCount, totalCount, percentage };
     };
@@ -167,6 +246,79 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
     const mainTasks = tasks?.filter(t => t.kind === 1) || [];
     const getSubTasks = (parentId) => tasks?.filter(t => t.kind === 2 && t.parent?.id === parentId) || [];
 
+    // Component để render câu hỏi
+    const renderQuestions = (taskId) => {
+        const questions = taskQuestions[taskId] || [];
+        
+        if (questions.length === 0) {
+            return <p style={{ textAlign: 'center', color: '#999' }}>Chưa có câu hỏi</p>;
+        }
+
+        return questions.map((question, qIdx) => {
+            const studentAnswer = getAnswerForQuestion(question.id);
+            const options = parseOptions(question.options);
+            const questionTypeLabel = getQuestionTypeLabel(question.questionType);
+            
+            return (
+                <Card 
+                    key={question.id} 
+                    size="small" 
+                    style={{ 
+                        marginTop: 12,
+                        marginBottom: 12,
+                        borderLeft: studentAnswer?.isCorrect ? '4px solid #52c41a' : studentAnswer ? '4px solid #ff4d4f' : '4px solid #d9d9d9',
+                    }}
+                    title={
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Câu {qIdx + 1}</span>
+                            {studentAnswer ? (
+                                studentAnswer.isCorrect ? (
+                                    <Tag color="green" icon={<CheckCircleOutlined />}>Đã nộp</Tag>
+                                ) : (
+                                    <Tag color="red" icon={<CloseCircleOutlined />}>Chưa nộp</Tag>
+                                )
+                            ) : (
+                                <Tag color="default">Chưa trả lời</Tag>
+                            )}
+                        </div>
+                    }
+                >
+                    <p><strong>❓ Câu hỏi:</strong> {question.question}</p>
+                    {questionTypeLabel && (
+                        <p><strong>📋 Loại:</strong> <Tag>{questionTypeLabel}</Tag></p>
+                    )}
+                    
+                    {/* Hiển thị options nếu có */}
+                    {options.length > 0 && (
+                        <div style={{ marginTop: 8 }}>
+                            <strong>🔘 Các lựa chọn:</strong>
+                            <div style={{ marginTop: 4, paddingLeft: 16 }}>
+                                {options.map((opt, optIdx) => (
+                                    <div key={optIdx} style={{ marginBottom: 4 }}>
+                                        <Tag color={studentAnswer?.answer === opt ? 'blue' : 'default'}>
+                                            {String.fromCharCode(65 + optIdx)}. {opt}
+                                        </Tag>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    
+                    {studentAnswer ? (
+                        <p style={{ marginTop: 8 }}>
+                            <strong>✍️ Câu trả lời của học viên:</strong> 
+                            <Tag color="blue">{studentAnswer.answer}</Tag>
+                        </p>
+                    ) : (
+                        <p style={{ marginTop: 8, color: '#999' }}>
+                            <em>Học viên chưa trả lời câu hỏi này</em>
+                        </p>
+                    )}
+                </Card>
+            );
+        });
+    };
+
     return (
         <PageWrapper 
             loading={loading}
@@ -216,6 +368,7 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
                         {mainTasks.map((task, taskIndex) => {
                             const taskStats = getTaskStats(task.id);
                             const subTasks = getSubTasks(task.id);
+                            const introItems = parseIntroduction(task.introduction);
                             
                             return (
                                 <Panel 
@@ -236,77 +389,87 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
                                     {task.description && (
                                         <p><strong>📄 Mô tả:</strong> {task.description}</p>
                                     )}
-                                    {task.introduction && (
-                                        <p><strong>💡 Giới thiệu:</strong> {task.introduction}</p>
+
+                                    {/* Render introduction */}
+                                    {introItems && introItems.length > 0 && (
+                                        <div style={{ marginTop: 8 }}>
+                                            <strong>💡 Giới thiệu:</strong>
+                                            {introItems.map((item, idx) => (
+                                                <div key={idx} style={{ marginTop: 8 }}>
+                                                    {item.title && <div style={{ fontWeight: 600, marginBottom: 6 }}>{item.title}</div>}
+                                                    {item.content && (
+                                                        <div>
+                                                            {String(item.content).split('\n').map((line, i) => (
+                                                                <p key={i} style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{line}</p>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
                                     )}
 
                                     <Divider />
 
+                                    {/* Hiển thị questions của main task */}
+                                    <strong>📋 Câu hỏi của Task:</strong>
+                                    {renderQuestions(task.id)}
+
                                     {/* SubTasks */}
-                                    {subTasks.length > 0 ? (
-                                        <Collapse>
-                                            {subTasks.map((subtask, subIndex) => {
-                                                const subtaskAnswers = groupedAnswersByTask[subtask.id] || [];
-                                                const subtaskStats = getTaskStats(subtask.id);
-                                                
-                                                return (
-                                                    <Panel 
-                                                        header={
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                <span>
-                                                                    <strong>SubTask {subIndex + 1}:</strong> {subtask.name || subtask.title}
-                                                                </span>
-                                                                {subtaskStats.totalCount > 0 && (
-                                                                    <Tag color={subtaskStats.percentage >= 70 ? 'green' : subtaskStats.percentage >= 50 ? 'orange' : 'red'}>
-                                                                        {subtaskStats.correctCount}/{subtaskStats.totalCount}
-                                                                    </Tag>
-                                                                )}
-                                                            </div>
-                                                        }
-                                                        key={subtask.id}
-                                                    >
-                                                        {subtask.description && (
-                                                            <p><strong>Mô tả:</strong> {subtask.description}</p>
-                                                        )}
-                                                        
-                                                        <Divider>Câu trả lời</Divider>
-                                                        
-                                                        {subtaskAnswers.length > 0 ? (
-                                                            subtaskAnswers.map((answer, idx) => (
-                                                                <Card 
-                                                                    key={answer.id} 
-                                                                    size="small" 
-                                                                    style={{ 
-                                                                        marginBottom: 12,
-                                                                        borderLeft: answer.isCorrect ? '4px solid #52c41a' : '4px solid #ff4d4f',
-                                                                    }}
-                                                                    title={
-                                                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                                            <span>Câu {idx + 1}</span>
-                                                                            {answer.isCorrect ? (
-                                                                                <Tag color="green" icon={<CheckCircleOutlined />}>Đúng</Tag>
-                                                                            ) : (
-                                                                                <Tag color="red" icon={<CloseCircleOutlined />}>Sai</Tag>
+                                    {subTasks.length > 0 && (
+                                        <>
+                                            <Divider>SubTasks</Divider>
+                                            <Collapse defaultActiveKey={subTasks[0]?.id}>
+                                                {subTasks.map((subtask, subIndex) => {
+                                                    const subtaskStats = getTaskStats(subtask.id);
+                                                    const subIntroItems = parseIntroduction(subtask.introduction);
+                                                    
+                                                    return (
+                                                        <Panel 
+                                                            header={
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                    <span>
+                                                                        <strong>SubTask {subIndex + 1}:</strong> {subtask.name || subtask.title}
+                                                                    </span>
+                                                                    {subtaskStats.totalCount > 0 && (
+                                                                        <Tag color={subtaskStats.percentage >= 70 ? 'green' : subtaskStats.percentage >= 50 ? 'orange' : 'red'}>
+                                                                            {subtaskStats.correctCount}/{subtaskStats.totalCount} ({subtaskStats.percentage}%)
+                                                                        </Tag>
+                                                                    )}
+                                                                </div>
+                                                            }
+                                                            key={subtask.id}
+                                                        >
+                                                            {subtask.description && (
+                                                                <p><strong>Mô tả:</strong> {subtask.description}</p>
+                                                            )}
+
+                                                            {/* Render subtask introduction */}
+                                                            {subIntroItems && subIntroItems.length > 0 && (
+                                                                <div style={{ marginBottom: 8 }}>
+                                                                    {subIntroItems.map((item, i) => (
+                                                                        <div key={i} style={{ marginTop: 8 }}>
+                                                                            {item.title && <div style={{ fontWeight: 600 }}>{item.title}</div>}
+                                                                            {item.content && (
+                                                                                <div>
+                                                                                    {String(item.content).split('\n').map((line, ii) => (
+                                                                                        <p key={ii} style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{line}</p>
+                                                                                    ))}
+                                                                                </div>
                                                                             )}
                                                                         </div>
-                                                                    }
-                                                                >
-                                                                    <p><strong>❓ Câu hỏi:</strong> {answer.taskQuestion?.question}</p>
-                                                                    {answer.taskQuestion?.questionType && (
-                                                                        <p><strong>📋 Loại:</strong> <Tag>{answer.taskQuestion.questionType}</Tag></p>
-                                                                    )}
-                                                                    <p><strong>✍️ Câu trả lời:</strong> <Tag color="blue">{answer.answer || '(Không có câu trả lời)'}</Tag></p>
-                                                                </Card>
-                                                            ))
-                                                        ) : (
-                                                            <p style={{ textAlign: 'center', color: '#999' }}>Chưa có câu trả lời</p>
-                                                        )}
-                                                    </Panel>
-                                                );
-                                            })}
-                                        </Collapse>
-                                    ) : (
-                                        <p style={{ textAlign: 'center', color: '#999' }}>Task này không có SubTask</p>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            
+                                                            <Divider>Câu trả lời</Divider>
+                                                            
+                                                            {renderQuestions(subtask.id)}
+                                                        </Panel>
+                                                    );
+                                                })}
+                                            </Collapse>
+                                        </>
                                     )}
                                 </Panel>
                             );

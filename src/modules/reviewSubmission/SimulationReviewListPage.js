@@ -90,16 +90,16 @@ const SimulationReviewListPage = ({ pageOptions }) => {
             dataIndex: 'title',
             width: getColumnWidth({ data, dataIndex: 'title', ratio: 15 }),
         },
-        {
-            title: labels.educator,
-            dataIndex: ['educator', 'account', 'fullName'],
-            width: getColumnWidth({ data, dataIndex: 'educator.account.fullName', ratio: 10 }),
-        },
-        {
-            title: labels.specialization,
-            dataIndex: ['specialization', 'name'],
-            width: getColumnWidth({ data, dataIndex: 'specialization.name', ratio: 10 }),
-        },
+        // {
+        //     title: labels.educator,
+        //     dataIndex: ['educator', 'account', 'fullName'],
+        //     width: getColumnWidth({ data, dataIndex: 'educator.account.fullName', ratio: 10 }),
+        // },
+        // {
+        //     title: labels.specialization,
+        //     dataIndex: ['specialization', 'name'],
+        //     width: getColumnWidth({ data, dataIndex: 'specialization.name', ratio: 10 }),
+        // },
         {
             title: labels.level,
             dataIndex: 'level',

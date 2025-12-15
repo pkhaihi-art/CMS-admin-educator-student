@@ -13,7 +13,15 @@ import useTranslate from '@hooks/useTranslate';
 import { commonMessage } from '@locales/intl';
 import SimulationForm from "@modules/simulation/simulation/SimulationForm";
 
+import { UserTypes } from '@constants';
+import { getData } from '@utils/localStorage';
+import { storageKeys } from '@constants';
+
 const EducatorSimulationSavePage = ({ pageOptions }) => {
+
+    const userType = getData(storageKeys.USER_TYPE);
+    const isEducator = userType === UserTypes.EDUCATOR;
+
     const translate = useTranslate();
     const { id } = useParams();
 
@@ -26,12 +34,18 @@ const EducatorSimulationSavePage = ({ pageOptions }) => {
     // Translate level options for the dropdown
     const levels = translate.formatKeys(levelOptions, ['label']);
 
-    const { detail, mixinFuncs, loading, onSave, setIsChangedFormValues, isEditing, title } = useSaveBase({
-        apiConfig: {
+    const apiConfiguration = isEducator
+        ? {
             getById: apiConfig.simulation.getSimulationForEducator,
             create: apiConfig.simulation.create,
             update: apiConfig.simulation.update,
-        },
+        }
+        : {
+            getById: apiConfig.simulation.getById,
+        };
+
+    const { detail, mixinFuncs, loading, onSave, setIsChangedFormValues, isEditing, title } = useSaveBase({
+        apiConfig: apiConfiguration,
         options: {
             getListUrl: pageOptions.listPageUrl,
             objectName: translate.formatMessage(commonMessage.simulation)?.toLowerCase(),

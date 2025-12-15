@@ -1,17 +1,15 @@
-import { Card, Col, Row } from 'antd';
+import { Card, Col, Row, Spin } from 'antd';
 import React, { useEffect, useState } from 'react';
-
-// Thư viện xử lý ngày tháng hiện đại của Ant Design (ví dụ: dayjs) thường được dùng thay moment.
-// Nếu DatePickerField của bạn sử dụng dayjs, thì việc này là phù hợp.
-import dayjs from 'dayjs'; 
+import dayjs from 'dayjs';
 
 import { confirmPasswordValidator, emailValidator, passwordValidator, phoneValidator } from '@utils/formValidator';
 
 import useBasicForm from '@hooks/useBasicForm';
 import TextField from '@components/common/form/TextField';
 import CropImageField from '@components/common/form/CropImageField';
-import DatePickerField from '@components/common/form/DatePickerField'; 
-import { AppConstants, DEFAULT_FORMAT, groupPermissionKindsOptions, groupRolesOptions } from '@constants';
+import DatePickerField from '@components/common/form/DatePickerField';
+import { AppConstants, DEFAULT_FORMAT, groupRolesOptions } from '@constants';
+import { statusOptions } from '@constants/masterData';
 import useFetch from '@hooks/useFetch';
 import apiConfig from '@constants/apiConfig';
 import useTranslate from '@hooks/useTranslate';
@@ -20,15 +18,15 @@ import { BaseForm } from '@components/common/form/BaseForm';
 import SelectField from '@components/common/form/SelectField';
 import { showErrorMessage } from '@services/notifyService';
 
-
 const AdminForm = (props) => {
     const translate = useTranslate();
-    const groupPermissionValues = translate.formatKeys(groupPermissionKindsOptions, ['label']);
+    const groupPermissionValues = translate.formatKeys(statusOptions, ['label']);
     const groupRolesValues = translate.formatKeys(groupRolesOptions, ['label']);
 
     const { formId, actions, dataDetail, onSubmit, setIsChangedFormValues, groups, branchs, isEditing } = props;
     const { execute: executeUpFile } = useFetch(apiConfig.file.upload);
     const [imageUrl, setImageUrl] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const { form, mixinFuncs, onValuesChange } = useBasicForm({
         onSubmit,
@@ -54,93 +52,171 @@ const AdminForm = (props) => {
         });
     };
 
-    const { data: admins } = useFetch(apiConfig.account.getList, {
+    const { data: admins, loading: adminsLoading } = useFetch(apiConfig.account.getList, {
         immediate: true,
-        mappingData: (res) => res?.data || [],
+        mappingData: (res) => {
+            console.log('🔍 Raw API Response:', res);
+            // Xử lý nhiều cấu trúc data khác nhau
+            const result = res?.data?.content || res?.data || res?.content || [];
+            console.log('📊 Mapped Admins:', result);
+            return Array.isArray(result) ? result : [];
+        },
     });
 
-    const handleSubmit = (values) => {
-        let hasError = false;
+    const handleSubmit = async (values) => {
+        console.log('🚀 === FORM SUBMIT STARTED ===');
+        console.log('📝 Form Values:', values);
+        console.log('✏️ Is Editing:', isEditing);
+        console.log('🖼️ Image URL:', imageUrl);
+        console.log('👥 Admins Data:', admins);
+        console.log('👥 Admins Type:', typeof admins, Array.isArray(admins));
+        console.log('⏳ Admins Loading:', adminsLoading);
 
-        // ... (Logic kiểm tra username, email, phone trùng lặp giữ nguyên) ...
-
-        if (!isEditing) {
-            const userByUsername = admins?.find((item) => item.username === values.username);
-            if (userByUsername) {
-                form.setFields([
-                    {
-                        name: 'username',
-                        errors: [translate.formatMessage(commonMessage.usernameExisted)],
-                    },
-                ]);
-                hasError = true;
-            } else {
-                form.setFields([{ name: 'username', errors: [] }]);
-            }
-        }
-
-        const emailConflict = admins?.find((item) => item.email === values.email && item.id !== dataDetail?.id);
-        if (emailConflict) {
-            form.setFields([
-                {
-                    name: 'email',
-                    errors: [translate.formatMessage(commonMessage.emailExisted)],
-                },
-            ]);
-            hasError = true;
-        } else {
-            form.setFields([{ name: 'email', errors: [] }]);
-        }
-
-        const phoneConflict = admins?.find((item) => item.phone === values.phone && item.id !== dataDetail?.id);
-        if (phoneConflict) {
-            form.setFields([
-                {
-                    name: 'phone',
-                    errors: [translate.formatMessage(commonMessage.phoneExisted)],
-                },
-            ]);
-            hasError = true;
-        } else {
-            form.setFields([{ name: 'phone', errors: [] }]);
-        }
-
-
-        if (hasError) {
-            showErrorMessage('Thông tin đã tồn tại!', translate);
+        // Kiểm tra nếu đang loading danh sách admins
+        if (adminsLoading) {
+            console.warn('⚠️ Admins still loading, preventing submit');
+            showErrorMessage('Đang tải dữ liệu, vui lòng đợi một chút!', translate);
             return;
         }
 
-        const formattedBirthday = values.birthday 
-            ? dayjs(values.birthday).format(DEFAULT_FORMAT) // Sử dụng dayjs để format
-            : null;
+        // Kiểm tra nếu đang submit
+        if (isSubmitting) {
+            console.warn('⚠️ Already submitting, preventing duplicate');
+            return;
+        }
 
-        return mixinFuncs.handleSubmit({ 
-            ...values, 
-            avatar: imageUrl, 
-            birthday: formattedBirthday, // Truyền giá trị đã format
-        });
+        setIsSubmitting(true);
+
+        try {
+            let hasError = false;
+
+            // Đảm bảo admins là array trước khi validate
+            const adminsList = Array.isArray(admins) ? admins : [];
+            console.log('✅ Admins List for validation:', adminsList);
+
+            // Validate username chỉ khi tạo mới
+            if (!isEditing && adminsList.length > 0) {
+                const userByUsername = adminsList.find((item) => item.username === values.username);
+                if (userByUsername) {
+                    console.error('❌ Username already exists:', values.username);
+                    form.setFields([
+                        {
+                            name: 'username',
+                            errors: [translate.formatMessage(commonMessage.usernameExisted)],
+                        },
+                    ]);
+                    hasError = true;
+                } else {
+                    form.setFields([{ name: 'username', errors: [] }]);
+                }
+            }
+
+            // Validate email
+            if (adminsList.length > 0) {
+                const emailConflict = adminsList.find((item) => item.email === values.email && item.id !== dataDetail?.id);
+                if (emailConflict) {
+                    console.error('❌ Email already exists:', values.email);
+                    form.setFields([
+                        {
+                            name: 'email',
+                            errors: [translate.formatMessage(commonMessage.emailExisted)],
+                        },
+                    ]);
+                    hasError = true;
+                } else {
+                    form.setFields([{ name: 'email', errors: [] }]);
+                }
+            }
+
+            // Validate phone (nếu có nhập)
+            if (values.phone && adminsList.length > 0) {
+                const phoneConflict = adminsList.find((item) => item.phone === values.phone && item.id !== dataDetail?.id);
+                if (phoneConflict) {
+                    console.error('❌ Phone already exists:', values.phone);
+                    form.setFields([
+                        {
+                            name: 'phone',
+                            errors: [translate.formatMessage(commonMessage.phoneExisted)],
+                        },
+                    ]);
+                    hasError = true;
+                } else {
+                    form.setFields([{ name: 'phone', errors: [] }]);
+                }
+            }
+
+            // Nếu có lỗi validation, dừng submit
+            if (hasError) {
+                console.error('❌ Validation failed, stopping submit');
+                showErrorMessage('Thông tin đã tồn tại!', translate);
+                setIsSubmitting(false);
+                return;
+            }
+
+            // Format birthday
+            const formattedBirthday = values.birthday 
+                ? dayjs(values.birthday).format(DEFAULT_FORMAT)
+                : null;
+
+            // Chuẩn bị data để submit
+            const submitData = {
+                ...values,
+                avatar: imageUrl,
+                birthday: formattedBirthday,
+                groupId: values.groupId || 15, // Đảm bảo luôn có groupId, mặc định là 15
+            };
+
+            console.log('✅ Validation passed, submitting data:', submitData);
+
+            // Gọi API submit
+            const result = await mixinFuncs.handleSubmit(submitData);
+            
+            console.log('✅ Submit completed:', result);
+            
+            return result;
+
+        } catch (error) {
+            console.error('❌ Submit error:', error);
+            showErrorMessage('Có lỗi xảy ra, vui lòng thử lại!', translate);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     useEffect(() => {
-        // Chuyển chuỗi ngày tháng từ dataDetail thành đối tượng dayjs để form hiển thị
+        console.log('📊 Data Detail Changed:', dataDetail);
+        
+        // Chuyển chuỗi ngày tháng từ dataDetail thành đối tượng dayjs
         const initialBirthday = dataDetail?.birthday 
             ? dayjs(dataDetail.birthday, DEFAULT_FORMAT) 
             : null;
 
         form.setFieldsValue({
-            username: dataDetail?.username,
-            fullName: dataDetail?.fullName,
-            email: dataDetail?.email,
-            phone: dataDetail?.phone,
-            groupId: dataDetail?.group?.id,
-            password: dataDetail?.password,
-            // Sử dụng dayjs
+            username: dataDetail?.username || '',
+            fullName: dataDetail?.fullName || '',
+            email: dataDetail?.email || '',
+            phone: dataDetail?.phone || '',
+            // Nếu đang edit thì lấy groupId từ dataDetail, nếu tạo mới thì mặc định là 15
+            groupId: dataDetail?.group?.id || (!isEditing ? 15 : undefined),
+            password: dataDetail?.password || '',
             birthday: initialBirthday,
-            status: dataDetail?.status, 
+            status: dataDetail?.status !== undefined ? dataDetail.status : undefined,
         });
-        setImageUrl(dataDetail.avatar);
-    }, [dataDetail]);
+        
+        setImageUrl(dataDetail?.avatar || null);
+    }, [dataDetail, form, isEditing]);
+
+    // Hiển thị loading khi đang tải danh sách admins
+    if (adminsLoading) {
+        return (
+            <Card className="card-form" bordered={false}>
+                <div style={{ textAlign: 'center', padding: '50px' }}>
+                    <Spin size="large" />
+                    <p style={{ marginTop: '16px' }}>Đang tải dữ liệu...</p>
+                </div>
+            </Card>
+        );
+    }
 
     return (
         <BaseForm id={formId} onFinish={handleSubmit} form={form} onValuesChange={onValuesChange}>
@@ -156,6 +232,7 @@ const AdminForm = (props) => {
                         />
                     </Col>
                 </Row>
+                
                 <Row gutter={16}>
                     <Col span={12}>
                         <TextField
@@ -212,9 +289,9 @@ const AdminForm = (props) => {
                     <Col span={12}>
                         <DatePickerField
                             name="birthday"
-                            label="Ngày sinh" 
-                            format="DD/MM/YYYY" 
-                            showTime={false} 
+                            label="Ngày sinh"
+                            format="DD/MM/YYYY"
+                            showTime={false}
                             style={{ width: '100%' }}
                         />
                     </Col>
@@ -224,7 +301,7 @@ const AdminForm = (props) => {
                             name="status"
                             label={translate.formatMessage(commonMessage.status)}
                             allowClear={false}
-                            options={groupPermissionValues} 
+                            options={groupPermissionValues}
                             requiredMsg={translate.formatMessage(commonMessage.required)}
                         />
                     </Col>
@@ -261,18 +338,23 @@ const AdminForm = (props) => {
                     </Col>
                 </Row>
 
-                <Row gutter={16} > 
+                <Row gutter={16}>
                     <Col span={12}>
                         <SelectField
+                            required
                             name="groupId"
                             label={translate.formatMessage(commonMessage.groupPermission)}
                             allowClear={false}
                             options={groups}
                             disabled={isEditing}
+                            requiredMsg={translate.formatMessage(commonMessage.required)}
                         />
                     </Col>
                 </Row>
-                <div className="footer-card-form">{actions}</div>
+                
+                <div className="footer-card-form">
+                    {actions}
+                </div>
             </Card>
         </BaseForm>
     );

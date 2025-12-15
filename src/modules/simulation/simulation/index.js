@@ -567,7 +567,20 @@ const SimulationListPage = ({ pageOptions }) => {
         {
             title: labels.title,
             dataIndex: 'title',
+            render: (text, record) => (
+                <Button
+                    type="link"
+                    style={{ padding: 0 }}
+                    onClick={(e) => {
+                        e.stopPropagation(); // tránh trigger row click
+                        navigate(`/simulation/${record.id}`);
+                    }}
+                >
+                    {text}
+                </Button>
+            ),
         },
+
         // Hiển thị specialization cho Admin
         ...(isEducator
             ? []
@@ -630,7 +643,7 @@ const SimulationListPage = ({ pageOptions }) => {
         <PageWrapper routes={pageOptions.renderBreadcrumbs(commonMessage, translate)}>
             <ListPage
                 searchForm={mixinFuncs.renderSearchForm({ fields: searchFields, initialValues: queryFilter })}
-                actionBar={mixinFuncs.renderActionBar()}
+                actionBar={isEducator ? mixinFuncs.renderActionBar() : null}
                 baseTable={
                     <BaseTable
                         columns={columns}

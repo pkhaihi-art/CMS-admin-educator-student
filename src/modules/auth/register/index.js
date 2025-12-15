@@ -40,13 +40,13 @@ const RegisterPage = () => {
         register(
             payload,
             (res) => {
-                antMessage.success(res?.message || 'Register success!');
+                antMessage.success(res?.message || 'Đăng ký thành công!');
                 setEmail(values.email);
                 setIdHash(res?.data?.idHash);
                 setStep('otp');
             },
             (err) => {
-                antMessage.error(err?.message || 'Register failed!');
+                antMessage.error(err?.message || 'Đăng ký thất bại!');
             },
         );
     };
@@ -60,11 +60,11 @@ const RegisterPage = () => {
         verifyOtp(
             payload,
             () => {
-                antMessage.success('OTP verified!');
+                antMessage.success('Xác thực OTP thành công!');
                 navigate('/login');
             },
             (err) => {
-                antMessage.error(err?.message || 'OTP verification failed!');
+                antMessage.error(err?.message || 'Xác thực OTP thất bại!');
             },
         );
     };
@@ -75,15 +75,15 @@ const RegisterPage = () => {
                 {/* Left */}
                 <div className={styles.left}>
                     <div className={styles.leftContent}>
-                        <h2>Welcome to our largest community</h2>
-                        <p>Let`s learn something new today!</p>
+                        <h2>Chào mừng đến với cộng đồng lớn nhất của chúng tôi</h2>
+                        <p>Hãy cùng học điều gì đó mới hôm nay!</p>
                         <img src="/images/element/02.svg" alt="Illustration" className={styles.illustration} />
                         <div className={styles.students}>
                             <img src="/images/avatar/01.jpg" alt="avatar" className={styles.avatar} />
                             <img src="/images/avatar/02.jpg" alt="avatar" className={styles.avatar} />
                             <img src="/images/avatar/03.jpg" alt="avatar" className={styles.avatar} />
                             <img src="/images/avatar/04.jpg" alt="avatar" className={styles.avatar} />
-                            <p>4k+ Students joined us, now it`s your turn.</p>
+                            <p>Hơn 4 nghìn học viên đã tham gia, giờ là lượt của bạn.</p>
                         </div>
                     </div>
                 </div>
@@ -95,120 +95,229 @@ const RegisterPage = () => {
 
                         {step === 'register' ? (
                             <>
-                                <h2>Sign up for your account!</h2>
-                                <p>Nice to see you! Please sign up with your account.</p>
+                                <div className={styles.formHeader}>
+                                    <h2>Đăng ký tài khoản của bạn!</h2>
+                                    <p>Rất vui được gặp bạn! Vui lòng đăng ký tài khoản.</p>
+                                </div>
 
-                                <Form layout="vertical" form={form} onFinish={onRegisterFinish}>
+                                <Form 
+                                    layout="vertical" 
+                                    form={form} 
+                                    onFinish={onRegisterFinish}
+                                    requiredMark={false}
+                                >
                                     <Row gutter={16}>
-                                        <Col xs={24} sm={24} md={12}>
-                                            <Form.Item name="fullName" label="Full Name *" rules={[{ required: true }]}>
-                                                <Input size="large" prefix={<UserOutlined />} placeholder="Full name" />
+                                        <Col xs={24} md={12}>
+                                            <Form.Item 
+                                                name="fullName" 
+                                                label="Họ và tên" 
+                                                rules={[
+                                                    { required: true, message: 'Vui lòng nhập họ và tên' },
+                                                    { min: 2, message: 'Họ tên phải có ít nhất 2 ký tự' },
+                                                ]}
+                                            >
+                                                <Input 
+                                                    size="large" 
+                                                    prefix={<UserOutlined className={styles.inputIcon} />} 
+                                                    placeholder="Nguyễn Văn A" 
+                                                />
                                             </Form.Item>
                                         </Col>
-                                        <Col xs={24} sm={24} md={12}>
-                                            <Form.Item name="username" label="Username *" rules={[{ required: true }]}>
-                                                <Input size="large" prefix={<UserOutlined />} placeholder="Username" />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-
-                                    <Row gutter={16}>
-                                        <Col xs={24} sm={24} md={12}>
-                                            <Form.Item name="phone" label="Phone number *" rules={[{ required: true }]}>
-                                                <Input size="large" prefix={<PhoneOutlined />} placeholder="0987654321" />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} sm={24} md={12}>
-                                            <Form.Item name="birthday" label="Birthday *" rules={[{ required: true }]}>
-                                                <DatePicker
-                                                    size="large"
-                                                    style={{ width: '100%' }}
-                                                    format="YYYY-MM-DD"
-                                                    placeholder="Select birthday"
-                                                    disabledDate={(current) => current && current > dayjs().endOf('day')}
+                                        <Col xs={24} md={12}>
+                                            <Form.Item 
+                                                name="username" 
+                                                label="Tên đăng nhập" 
+                                                rules={[
+                                                    { required: true, message: 'Vui lòng nhập tên đăng nhập' },
+                                                    { min: 3, message: 'Tên đăng nhập phải có ít nhất 3 ký tự' },
+                                                ]}
+                                            >
+                                                <Input 
+                                                    size="large" 
+                                                    prefix={<UserOutlined className={styles.inputIcon} />} 
+                                                    placeholder="nguyenvana" 
                                                 />
                                             </Form.Item>
                                         </Col>
                                     </Row>
 
                                     <Row gutter={16}>
-                                        <Col xs={24} sm={24} md={12}>
-                                            <Form.Item name="email" label="Email address *" rules={[{ required: true }]}>
-                                                <Input size="large" prefix={<MailOutlined />} placeholder="E-mail" />
+                                        <Col xs={24} md={12}>
+                                            <Form.Item 
+                                                name="email" 
+                                                label="Địa chỉ email" 
+                                                rules={[
+                                                    { required: true, message: 'Vui lòng nhập email' },
+                                                    { type: 'email', message: 'Vui lòng nhập email hợp lệ' },
+                                                ]}
+                                            >
+                                                <Input 
+                                                    size="large" 
+                                                    prefix={<MailOutlined className={styles.inputIcon} />} 
+                                                    placeholder="example@email.com" 
+                                                />
                                             </Form.Item>
                                         </Col>
-                                        <Col xs={24} sm={24} md={12}>
-                                            <Form.Item name="password" label="Password *" rules={[{ required: true }]}>
-                                                <Input.Password size="large" prefix={<LockOutlined />} placeholder="********" />
+                                        <Col xs={24} md={12}>
+                                            <Form.Item 
+                                                name="phone" 
+                                                label="Số điện thoại" 
+                                                rules={[
+                                                    { required: true, message: 'Vui lòng nhập số điện thoại' },
+                                                    { pattern: /^[0-9]{10,11}$/, message: 'Vui lòng nhập số điện thoại hợp lệ' },
+                                                ]}
+                                            >
+                                                <Input 
+                                                    size="large" 
+                                                    prefix={<PhoneOutlined className={styles.inputIcon} />} 
+                                                    placeholder="0987654321" 
+                                                />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+
+                                    <Row gutter={16}>
+                                        <Col xs={24} md={12}>
+                                            <Form.Item 
+                                                name="birthday" 
+                                                label="Ngày sinh" 
+                                                rules={[{ required: true, message: 'Vui lòng chọn ngày sinh' }]}
+                                            >
+                                                <DatePicker
+                                                    size="large"
+                                                    style={{ width: '100%' }}
+                                                    format="DD/MM/YYYY"
+                                                    placeholder="Chọn ngày sinh"
+                                                    disabledDate={(current) => current && current > dayjs().endOf('day')}
+                                                />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col xs={24} md={12}>
+                                            <Form.Item 
+                                                name="password" 
+                                                label="Mật khẩu" 
+                                                rules={[
+                                                    { required: true, message: 'Vui lòng nhập mật khẩu' },
+                                                    { min: 6, message: 'Mật khẩu phải có ít nhất 6 ký tự' },
+                                                ]}
+                                            >
+                                                <Input.Password 
+                                                    size="large" 
+                                                    prefix={<LockOutlined className={styles.inputIcon} />} 
+                                                    placeholder="Nhập mật khẩu" 
+                                                />
                                             </Form.Item>
                                         </Col>
                                     </Row>
 
                                     <Form.Item
                                         name="confirmPassword"
-                                        label="Confirm Password *"
+                                        label="Xác nhận mật khẩu"
                                         dependencies={['password']}
                                         rules={[
-                                            { required: true },
+                                            { required: true, message: 'Vui lòng xác nhận mật khẩu' },
                                             ({ getFieldValue }) => ({
                                                 validator(_, value) {
                                                     if (!value || getFieldValue('password') === value) {
                                                         return Promise.resolve();
                                                     }
-                                                    return Promise.reject(new Error('Passwords do not match!'));
+                                                    return Promise.reject(new Error('Mật khẩu không khớp!'));
                                                 },
                                             }),
                                         ]}
                                     >
-                                        <Input.Password size="large" prefix={<LockOutlined />} placeholder="********" />
+                                        <Input.Password 
+                                            size="large" 
+                                            prefix={<LockOutlined className={styles.inputIcon} />} 
+                                            placeholder="Xác nhận mật khẩu" 
+                                        />
                                     </Form.Item>
 
-                                    <Form.Item>
-                                        <Button type="primary" htmlType="submit" size="large" block loading={registering}>
-                                            Sign Up
+                                    <Form.Item className={styles.submitButton}>
+                                        <Button 
+                                            type="primary" 
+                                            htmlType="submit" 
+                                            size="large" 
+                                            block 
+                                            loading={registering}
+                                        >
+                                            Tạo tài khoản
                                         </Button>
                                     </Form.Item>
                                 </Form>
 
-
-
                                 <div className={styles.divider}>
-                                    <hr />
-                                    <span>Or</span>
-                                    <hr />
+                                    <span>Hoặc tiếp tục với</span>
                                 </div>
 
                                 <div className={styles.socialButtons}>
-                                    <Button icon={<GoogleOutlined />} block className={styles.google}>
-                                        Signup with Google
+                                    <Button 
+                                        icon={<GoogleOutlined />} 
+                                        size="large"
+                                        block 
+                                        className={styles.google}
+                                    >
+                                        Google
                                     </Button>
-                                    <Button icon={<FacebookFilled />} block className={styles.facebook}>
-                                        Signup with Facebook
+                                    <Button 
+                                        icon={<FacebookFilled />} 
+                                        size="large"
+                                        block 
+                                        className={styles.facebook}
+                                    >
+                                        Facebook
                                     </Button>
                                 </div>
 
                                 <div className={styles.signInRedirect}>
-                                    <span>Already have an account? <a href="/login">Sign in here</a></span>
+                                    Đã có tài khoản? <a href="/login">Đăng nhập tại đây</a>
                                 </div>
                             </>
                         ) : (
                             <>
-                                <h2>Verify OTP</h2>
-                                <p>We’ve sent a verification code to: <strong>{email}</strong></p>
-                                <Form form={otpForm} onFinish={onOtpFinish} layout="vertical">
+                                <div className={styles.formHeader}>
+                                    <h2>Xác thực email của bạn</h2>
+                                    <p>Chúng tôi đã gửi mã xác thực đến</p>
+                                    <strong className={styles.emailDisplay}>{email}</strong>
+                                </div>
+
+                                <Form 
+                                    form={otpForm} 
+                                    onFinish={onOtpFinish} 
+                                    layout="vertical"
+                                    requiredMark={false}
+                                >
                                     <Form.Item
                                         name="otp"
-                                        label="OTP Code"
-                                        rules={[{ required: true, message: 'Please input the OTP!' }]}
+                                        label="Mã xác thực"
+                                        rules={[
+                                            { required: true, message: 'Vui lòng nhập mã xác thực' },
+                                            { len: 6, message: 'Mã OTP phải có 6 chữ số' },
+                                        ]}
                                     >
-                                        <Input placeholder="Enter your OTP" />
+                                        <Input 
+                                            size="large"
+                                            placeholder="Nhập mã 6 chữ số" 
+                                            maxLength={6}
+                                            className={styles.otpInput}
+                                        />
                                     </Form.Item>
 
                                     <Form.Item>
-                                        <Button type="primary" htmlType="submit" block loading={verifying}>
-                                            Verify
+                                        <Button 
+                                            type="primary" 
+                                            htmlType="submit" 
+                                            size="large"
+                                            block 
+                                            loading={verifying}
+                                        >
+                                            Xác thực email
                                         </Button>
                                     </Form.Item>
+
+                                    <div className={styles.resendSection}>
+                                        Không nhận được mã? <a href="#" onClick={(e) => e.preventDefault()}>Gửi lại</a>
+                                    </div>
                                 </Form>
                             </>
                         )}

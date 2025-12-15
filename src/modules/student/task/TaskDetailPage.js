@@ -12,7 +12,7 @@ import {
     Steps,
     Alert,
     Progress,
-    Modal
+    Modal,
 } from 'antd';
 import { 
     ArrowLeftOutlined,
@@ -22,7 +22,7 @@ import {
     FileImageOutlined,
     CheckCircleOutlined,
     ClockCircleOutlined,
-    BookOutlined
+    BookOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { showErrorMessage, showSuccessMessage } from '@services/notifyService';
@@ -156,10 +156,10 @@ const TaskDetailPage = ({ pageOptions }) => {
         if (!progress) return { text: 'Chưa bắt đầu', color: 'default' };
         
         switch(progress.state) {
-            case 0: return { text: 'Chưa bắt đầu', color: 'default' };
-            case 1: return { text: 'Đang thực hiện', color: 'processing' };
-            case 2: return { text: 'Đã hoàn thành', color: 'success' };
-            default: return { text: 'Chưa xác định', color: 'default' };
+                        case 0: return { text: 'Chưa bắt đầu', color: 'default' };
+                        case 1: return { text: 'Đang thực hiện', color: 'processing' };
+                        case 2: return { text: 'Đã hoàn thành', color: 'success' };
+                        default: return { text: 'Chưa xác định', color: 'default' };
         }
     };
 
@@ -305,11 +305,11 @@ const TaskDetailPage = ({ pageOptions }) => {
                             <Alert
                                 message={progressStatus.text}
                                 type={progressStatus.color === 'success' ? 'success' : 
-                                      progressStatus.color === 'processing' ? 'info' : 'warning'}
+                                    progressStatus.color === 'processing' ? 'info' : 'warning'}
                                 showIcon
                                 icon={progressStatus.color === 'success' ? <CheckCircleOutlined /> : 
-                                      progressStatus.color === 'processing' ? <ClockCircleOutlined /> : 
-                                      <BookOutlined />}
+                                    progressStatus.color === 'processing' ? <ClockCircleOutlined /> : 
+                                        <BookOutlined />}
                                 style={{ marginBottom: 16 }}
                             />
 

@@ -22,12 +22,12 @@ export const storageKeys = {
     TENANT_HEADER: `X-tenant`,
     TENANT_API_URL: `${appName}-${process.env.REACT_APP_ENV}-tenant-api-url`,
     USER_TYPE: 'USER_TYPE',
-    PARENT_TASK_INFO: 'PARENT_TASK_INFO',
 };
 
 export const AppConstants = {
     apiRootUrl: process.env.REACT_APP_API,
-    contentRootUrl: `${process.env.REACT_APP_API}v1/file/download`,
+    // contentRootUrl: `${process.env.REACT_APP_API}v1/file/download`,
+    contentRootUrl: `${process.env.REACT_APP_API_MEDIA}v1/file/download`,
     mediaRootUrl: `${process.env.REACT_APP_API_MEDIA}`,
     langKey: 'vi',
 };
@@ -92,7 +92,7 @@ export const STATE_WAITING_OTP = 0;
 export const STATUS_INACTIVE = -1;
 export const STATUS_DELETE = -2;
 
-export const DEFAULT_TABLE_ITEM_SIZE = 30;
+export const DEFAULT_TABLE_ITEM_SIZE = 100;
 export const DEFAULT_TABLE_PAGE_START = 0;
 
 export const commonStatus = {

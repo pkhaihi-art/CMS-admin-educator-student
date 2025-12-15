@@ -13,7 +13,7 @@ import {
     Image,
     Statistic,
     Timeline,
-    Progress
+    Progress,
 } from 'antd';
 import { 
     TrophyOutlined,
@@ -22,7 +22,7 @@ import {
     ClockCircleOutlined,
     CheckCircleOutlined,
     StarOutlined,
-    FireOutlined
+    FireOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { showErrorMessage } from '@services/notifyService';
@@ -44,7 +44,7 @@ const AchievementPage = ({ pageOptions }) => {
     const [statistics, setStatistics] = useState({
         total: 0,
         thisMonth: 0,
-        thisWeek: 0
+        thisWeek: 0,
     });
     
     const { execute: getAchievements } = useFetch(apiConfig.achievement.getListForStudent);
@@ -79,18 +79,18 @@ const AchievementPage = ({ pageOptions }) => {
         const now = dayjs();
         const thisMonthCount = achievementList.filter(a => 
             dayjs(a.createdDate).month() === now.month() && 
-            dayjs(a.createdDate).year() === now.year()
+            dayjs(a.createdDate).year() === now.year(),
         ).length;
         
         const thisWeekCount = achievementList.filter(a => 
             dayjs(a.createdDate).week() === now.week() && 
-            dayjs(a.createdDate).year() === now.year()
+            dayjs(a.createdDate).year() === now.year(),
         ).length;
 
         setStatistics({
             total: achievementList.length,
             thisMonth: thisMonthCount,
-            thisWeek: thisWeekCount
+            thisWeek: thisWeekCount,
         });
     };
 
@@ -114,10 +114,10 @@ const AchievementPage = ({ pageOptions }) => {
 
     const getRankIcon = (index) => {
         switch(index) {
-            case 0: return <TrophyOutlined style={{ color: '#FFD700', fontSize: 24 }} />;
-            case 1: return <TrophyOutlined style={{ color: '#C0C0C0', fontSize: 24 }} />;
-            case 2: return <TrophyOutlined style={{ color: '#CD7F32', fontSize: 24 }} />;
-            default: return <TrophyOutlined style={{ color: '#999', fontSize: 20 }} />;
+                        case 0: return <TrophyOutlined style={{ color: '#FFD700', fontSize: 24 }} />;
+                        case 1: return <TrophyOutlined style={{ color: '#C0C0C0', fontSize: 24 }} />;
+                        case 2: return <TrophyOutlined style={{ color: '#CD7F32', fontSize: 24 }} />;
+                        default: return <TrophyOutlined style={{ color: '#999', fontSize: 20 }} />;
         }
     };
 
@@ -125,7 +125,7 @@ const AchievementPage = ({ pageOptions }) => {
         const config = {
             1: { color: 'green', text: 'Dễ' },
             2: { color: 'orange', text: 'Trung bình' },
-            3: { color: 'red', text: 'Khó' }
+            3: { color: 'red', text: 'Khó' },
         };
         return config[level] || { color: 'default', text: 'Chưa xác định' };
     };

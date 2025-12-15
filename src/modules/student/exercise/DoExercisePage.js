@@ -12,7 +12,7 @@ import {
     Result,
     Divider,
     Row,
-    Col
+    Col,
 } from 'antd';
 import { 
     ArrowLeftOutlined,
@@ -20,7 +20,7 @@ import {
     CheckCircleOutlined,
     CloseCircleOutlined,
     TrophyOutlined,
-    SendOutlined
+    SendOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { showErrorMessage, showSuccessMessage } from '@services/notifyService';
@@ -129,7 +129,7 @@ const DoExercisePage = ({ pageOptions }) => {
                 setScore({
                     correct: correct,
                     total: previousAnswers.length,
-                    percentage: (correct / previousAnswers.length * 100).toFixed(1)
+                    percentage: (correct / previousAnswers.length * 100).toFixed(1),
                 });
             }
         } catch (error) {
@@ -140,7 +140,7 @@ const DoExercisePage = ({ pageOptions }) => {
     const handleAnswerChange = (questionId, value) => {
         setAnswers({
             ...answers,
-            [questionId]: value
+            [questionId]: value,
         });
     };
 
@@ -217,7 +217,7 @@ const DoExercisePage = ({ pageOptions }) => {
             setScore({
                 correct: correct,
                 total: questions.length,
-                percentage: (correct / questions.length * 100).toFixed(1)
+                percentage: (correct / questions.length * 100).toFixed(1),
             });
             
             // Complete task

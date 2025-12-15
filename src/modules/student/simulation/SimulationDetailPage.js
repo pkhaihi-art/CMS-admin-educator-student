@@ -15,7 +15,7 @@ import {
     Space,
     Typography,
     Collapse,
-    Empty
+    Empty,
 } from 'antd';
 import { 
     ClockCircleOutlined, 
@@ -25,7 +25,7 @@ import {
     BookOutlined,
     ArrowLeftOutlined,
     CheckCircleOutlined,
-    LockOutlined
+    LockOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { showErrorMessage } from '@services/notifyService';
@@ -113,19 +113,19 @@ const SimulationDetailPage = ({ pageOptions }) => {
 
     const getLevelColor = (level) => {
         switch(level) {
-            case 1: return 'green';
-            case 2: return 'orange';
-            case 3: return 'red';
-            default: return 'default';
+                        case 1: return 'green';
+                        case 2: return 'orange';
+                        case 3: return 'red';
+                        default: return 'default';
         }
     };
 
     const getLevelText = (level) => {
         switch(level) {
-            case 1: return 'Dễ';
-            case 2: return 'Trung bình';
-            case 3: return 'Khó';
-            default: return 'Chưa xác định';
+                        case 1: return 'Dễ';
+                        case 2: return 'Trung bình';
+                        case 3: return 'Khó';
+                        default: return 'Chưa xác định';
         }
     };
 
@@ -143,7 +143,7 @@ const SimulationDetailPage = ({ pageOptions }) => {
         
         return parentTasks.map(parent => ({
             ...parent,
-            children: childTasks.filter(child => child.parent.id === parent.id)
+            children: childTasks.filter(child => child.parent.id === parent.id),
         }));
     };
 

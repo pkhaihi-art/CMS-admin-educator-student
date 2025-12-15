@@ -14,7 +14,7 @@ const ForgotPasswordPage = () => {
 
     const [form] = Form.useForm();
 
-    const { passwordRules, confirmPasswordRules } = usePasswordValidation(8);
+    const { passwordRules } = usePasswordValidation(8);
 
     const { execute: requestForgetPassword, loading: requestLoading } = useFetch(
         apiConfig.account.requestForgetPassword,
@@ -100,7 +100,7 @@ const ForgotPasswordPage = () => {
                             >
                                 <Form.Item
                                     name="email"
-                                    label="Email *"
+                                    label="Email"
                                     rules={[
                                         { required: true, message: 'Vui lòng nhập email!' },
                                         { type: 'email', message: 'Email không hợp lệ!' },
@@ -108,7 +108,7 @@ const ForgotPasswordPage = () => {
                                 >
                                     <Input 
                                         size="large" 
-                                        prefix={<MailOutlined />} 
+                                        prefix={<MailOutlined className={styles.inputIcon} />} 
                                         placeholder="Nhập email của bạn" 
                                     />
                                 </Form.Item>
@@ -135,7 +135,7 @@ const ForgotPasswordPage = () => {
                             >
                                 <Form.Item
                                     name="otp"
-                                    label="Mã OTP *"
+                                    label="Mã OTP"
                                     rules={[
                                         { required: true, message: 'Vui lòng nhập mã OTP!' },
                                         { len: 6, message: 'OTP phải gồm 6 số!' },
@@ -143,7 +143,7 @@ const ForgotPasswordPage = () => {
                                 >
                                     <Input 
                                         size="large" 
-                                        prefix={<SafetyOutlined />} 
+                                        prefix={<SafetyOutlined className={styles.inputIcon} />} 
                                         placeholder="Nhập mã OTP" 
                                         maxLength={6}
                                     />
@@ -151,26 +151,35 @@ const ForgotPasswordPage = () => {
 
                                 <Form.Item
                                     name="newPassword"
-                                    label="Mật khẩu mới *"
+                                    label="Mật khẩu mới"
                                     rules={passwordRules}
-                                    extra="Mật khẩu phải có ít nhất 8 ký tự"
                                 >
                                     <Input.Password
                                         size="large"
-                                        prefix={<LockOutlined />}
+                                        prefix={<LockOutlined className={styles.inputIcon} />}
                                         placeholder="Nhập mật khẩu mới"
                                     />
                                 </Form.Item>
 
                                 <Form.Item
                                     name="confirmPassword"
-                                    label="Xác nhận mật khẩu *"
+                                    label="Xác nhận mật khẩu"
                                     dependencies={['newPassword']}
-                                    rules={confirmPasswordRules(form.getFieldValue)}
+                                    rules={[
+                                        { required: true, message: 'Vui lòng xác nhận mật khẩu!' },
+                                        ({ getFieldValue }) => ({
+                                            validator(_, value) {
+                                                if (!value || getFieldValue('newPassword') === value) {
+                                                    return Promise.resolve();
+                                                }
+                                                return Promise.reject(new Error('Mật khẩu không khớp!'));
+                                            },
+                                        }),
+                                    ]}
                                 >
                                     <Input.Password
                                         size="large"
-                                        prefix={<LockOutlined />}
+                                        prefix={<LockOutlined className={styles.inputIcon} />}
                                         placeholder="Nhập lại mật khẩu"
                                     />
                                 </Form.Item>

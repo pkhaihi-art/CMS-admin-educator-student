@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Form, Button, Checkbox, Input, message as antMessage, Segmented } from 'antd';
+import { Form, Button, Input, message as antMessage, Segmented } from 'antd';
 import {
     LockOutlined,
     MailOutlined,
@@ -67,40 +67,37 @@ const LoginPage = () => {
             setCacheAccessToken(res.access_token);
             setData(storageKeys.USER_KIND, res.user_kind);
             
-            // Lưu userType vào localStorage
             setData(storageKeys.USER_TYPE, userType);
-            
-            // Dispatch action để lưu userType vào Redux store
             dispatch(accountActions.setUserType(userType));
 
             if (userType === UserTypes.EDUCATOR) {
                 fetchEducatorProfile({
                     onCompleted: () => {
-                        antMessage.success('Login successful!');
+                        antMessage.success('Đăng nhập thành công!');
                         navigate('/');
                     },
                     onError: () => {
-                        antMessage.error('Failed to load educator profile!');
+                        antMessage.error('Không thể tải thông tin Khoa chuyên môn!');
                     },
                 });
             } else if (userType === UserTypes.STUDENT) {
                 fetchStudentProfile({
                     onCompleted: () => {
-                        antMessage.success('Login successful!');
+                        antMessage.success('Đăng nhập thành công!');
                         navigate('/');
                     },
                     onError: () => {
-                        antMessage.error('Failed to load student profile!');
+                        antMessage.error('Không thể tải thông tin học viên!');
                     },
                 });
             } else {
                 fetchProfile({
                     onCompleted: () => {
-                        antMessage.success('Login successful!');
+                        antMessage.success('Đăng nhập thành công!');
                         navigate('/');
                     },
                     onError: () => {
-                        antMessage.error('Failed to load admin profile!');
+                        antMessage.error('Không thể tải thông tin quản trị viên!');
                     },
                 });
             }
@@ -111,7 +108,7 @@ const LoginPage = () => {
                 data: educatorPayload,
                 onCompleted: handleLoginSuccess,
                 onError: () => {
-                    antMessage.error('Educator login failed!');
+                    antMessage.error('Đăng nhập thất bại!');
                 },
             });
         } else if (userType === UserTypes.STUDENT) {
@@ -119,7 +116,7 @@ const LoginPage = () => {
                 data: studentPayload,
                 onCompleted: handleLoginSuccess,
                 onError: () => {
-                    antMessage.error('Student login failed!');
+                    antMessage.error('Đăng nhập thất bại!');
                 },
             });
         } else {
@@ -127,7 +124,7 @@ const LoginPage = () => {
                 data: adminPayload,
                 onCompleted: handleLoginSuccess,
                 onError: () => {
-                    antMessage.error('Admin login failed!');
+                    antMessage.error('Đăng nhập thất bại!');
                 },
             });
         }
@@ -136,103 +133,131 @@ const LoginPage = () => {
     return (
         <div className={styles.wrapper}>
             <div className={styles.container}>
+                {/* Left */}
                 <div className={styles.left}>
                     <div className={styles.leftContent}>
-                        <h2>Welcome to our largest community</h2>
-                        <p>Let`s learn something new today!</p>
-                        <img src="/images/element/02.svg" alt="Illustration" className={styles.illustration}/>
+                        <h2>Chào mừng đến với cộng đồng lớn nhất của chúng tôi</h2>
+                        <p>Hãy cùng học điều gì đó mới hôm nay!</p>
+                        <img src="/images/element/02.svg" alt="Illustration" className={styles.illustration} />
                         <div className={styles.students}>
-                            <div className={styles.avatars}>
-                                <img src="/images/avatar/01.jpg" alt="avatar 1" className={styles.avatar}/>
-                                <img src="/images/avatar/02.jpg" alt="avatar 2" className={styles.avatar}/>
-                                <img src="/images/avatar/03.jpg" alt="avatar 3" className={styles.avatar}/>
-                                <img src="/images/avatar/04.jpg" alt="avatar 4" className={styles.avatar}/>
-                            </div>
-                            <p>4k+ Students joined us, now it`s your turn.</p>
+                            <img src="/images/avatar/01.jpg" alt="avatar" className={styles.avatar} />
+                            <img src="/images/avatar/02.jpg" alt="avatar" className={styles.avatar} />
+                            <img src="/images/avatar/03.jpg" alt="avatar" className={styles.avatar} />
+                            <img src="/images/avatar/04.jpg" alt="avatar" className={styles.avatar} />
+                            <p>Hơn 4 nghìn học viên đã tham gia, giờ là lượt của bạn.</p>
                         </div>
                     </div>
                 </div>
 
+                {/* Right */}
                 <div className={styles.right}>
                     <div className={styles.formBox}>
-                        <div className={styles.wave}>👋</div>
-                        <h2>Login into ITDream!</h2>
-                        <p>Nice to see you! Please log in with your account.</p>
+                        <img src="/images/element/03.svg" className={styles.waveIcon} alt="icon" />
+
+                        <div className={styles.formHeader}>
+                            <h2>Đăng nhập vào ITDream!</h2>
+                            <p>Rất vui được gặp bạn! Vui lòng đăng nhập với tài khoản của bạn.</p>
+                        </div>
 
                         <Segmented
                             options={[
-                                { label: 'Student', value: UserTypes.STUDENT },
-                                { label: 'Educator', value: UserTypes.EDUCATOR },
-                                { label: 'Admin', value: UserTypes.ADMIN },
+                                { label: 'Học viên', value: UserTypes.STUDENT },
+                                { label: 'Khoa chuyên môn', value: UserTypes.EDUCATOR },
+                                { label: 'Quản trị', value: UserTypes.ADMIN },
                             ]}
                             value={userType}
                             onChange={setUserType}
-                            style={{ marginBottom: 24 }}
+                            style={{ marginBottom: 24, width: '100%' }}
+                            block
                         />
 
-                        <Form layout="vertical" onFinish={onFinish}>
+                        <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
                             {userType === UserTypes.ADMIN ? (
                                 <Form.Item
                                     name="username"
-                                    label="Username *"
-                                    rules={[{ required: true, message: 'Please input your username!' }]}
+                                    label="Tên đăng nhập"
+                                    rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập!' }]}
                                 >
-                                    <Input size="large" prefix={<UserOutlined />} placeholder="Username" />
+                                    <Input 
+                                        size="large" 
+                                        prefix={<UserOutlined className={styles.inputIcon} />} 
+                                        placeholder="Tên đăng nhập" 
+                                    />
                                 </Form.Item>
                             ) : (
                                 <Form.Item
                                     name="email"
-                                    label="Email address *"
-                                    rules={[{ required: true, message: 'Please input your email!' }]}
+                                    label="Địa chỉ email"
+                                    rules={[
+                                        { required: true, message: 'Vui lòng nhập email!' },
+                                        { type: 'email', message: 'Vui lòng nhập email hợp lệ!' },
+                                    ]}
                                 >
-                                    <Input size="large" prefix={<MailOutlined />} placeholder="E-mail" />
+                                    <Input 
+                                        size="large" 
+                                        prefix={<MailOutlined className={styles.inputIcon} />} 
+                                        placeholder="example@email.com" 
+                                    />
                                 </Form.Item>
                             )}
 
                             <Form.Item
                                 name="password"
-                                label="Password *"
-                                rules={[{ required: true, message: 'Please input your password!' }]}
-                                extra="Your password must be 8 characters at least"
+                                label="Mật khẩu"
+                                rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
                             >
                                 <Input.Password
                                     size="large"
-                                    prefix={<LockOutlined />}
-                                    placeholder="Password"
+                                    prefix={<LockOutlined className={styles.inputIcon} />}
+                                    placeholder="Nhập mật khẩu"
                                 />
                             </Form.Item>
 
                             <div className={styles.row}>
-                                <span>Forgot password?</span>
+                                <span>Quên mật khẩu?</span>
                                 <a href="/forgot-password" className={styles.forgotLink}>
-                                    Click here to reset password
+                                    Nhấn vào đây để đặt lại mật khẩu
                                 </a>
                             </div>
 
-                            <Form.Item>
-                                <Button type="primary" htmlType="submit" size="large" block loading={loading}>
-                                    Login
+                            <Form.Item className={styles.submitButton}>
+                                <Button 
+                                    type="primary" 
+                                    htmlType="submit" 
+                                    size="large" 
+                                    block 
+                                    loading={loading}
+                                >
+                                    Đăng nhập
                                 </Button>
                             </Form.Item>
                         </Form>
 
                         <div className={styles.divider}>
-                            <hr />
-                            <span>Or</span>
-                            <hr />
+                            <span>Hoặc tiếp tục với</span>
                         </div>
 
                         <div className={styles.socialButtons}>
-                            <Button icon={<GoogleOutlined />} block className={styles.google}>
-                                Login with Google
+                            <Button 
+                                icon={<GoogleOutlined />} 
+                                size="large"
+                                block 
+                                className={styles.google}
+                            >
+                                Google
                             </Button>
-                            <Button icon={<FacebookFilled />} block className={styles.facebook}>
-                                Login with Facebook
+                            <Button 
+                                icon={<FacebookFilled />} 
+                                size="large"
+                                block 
+                                className={styles.facebook}
+                            >
+                                Facebook
                             </Button>
                         </div>
 
-                        <div className={styles.signUpRedirect}>
-                            Don`t have an account? <a href="/register">Signup here</a>
+                        <div className={styles.signInRedirect}>
+                            Chưa có tài khoản? <a href="/register">Đăng ký tại đây</a>
                         </div>
                     </div>
                 </div>
