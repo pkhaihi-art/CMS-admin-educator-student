@@ -33,16 +33,61 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
     // Dịch questionType options
     const questionTypeValues = translate.formatKeys(questionTypeOptions, ['label']);
 
-    // helper: parse "introduction" which might be a JSON string or already an object/array
+    // Helper: kiểm tra xem có phải JSON string không
+    const isJsonString = (str) => {
+        if (!str || typeof str !== 'string') return false;
+        const trimmed = str.trim();
+        if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return false;
+        try {
+            JSON.parse(str);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    };
+
+    // Helper: parse introduction which might be a JSON string or already an object/array
     const parseIntroduction = (introduction) => {
         if (!introduction) return null;
+        
         try {
-            const parsed = typeof introduction === 'string' ? JSON.parse(introduction) : introduction;
+            const parsed = isJsonString(introduction) 
+                ? JSON.parse(introduction) 
+                : introduction;
+            
             if (Array.isArray(parsed)) return parsed;
-            return [parsed];
+            if (typeof parsed === 'object') return [parsed];
+            return [{ title: null, content: String(introduction) }];
         } catch (e) {
             return [{ title: null, content: String(introduction) }];
         }
+    };
+
+    // Helper: render content - hỗ trợ cả HTML và plain text
+    const renderContent = (content) => {
+        if (!content) return null;
+        
+        // Nếu content chứa HTML tags
+        if (typeof content === 'string' && content.includes('<')) {
+            return (
+                <div 
+                    className="html-content"
+                    style={{ 
+                        lineHeight: '1.6',
+                        '& p': { margin: '8px 0' },
+                        '& ul, & ol': { paddingLeft: '20px', margin: '8px 0' },
+                        '& li': { margin: '4px 0' },
+                        '& h1, & h2, & h3': { margin: '12px 0 8px 0' },
+                    }}
+                    dangerouslySetInnerHTML={{ __html: content }}
+                />
+            );
+        }
+        
+        // Plain text - giữ nguyên xuống dòng
+        return String(content).split('\n').map((line, i) => (
+            <p key={i} style={{ margin: '4px 0', whiteSpace: 'pre-wrap' }}>{line}</p>
+        ));
     };
 
     // Fetch danh sách Task/SubTask
@@ -273,9 +318,9 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
                             <span>Câu {qIdx + 1}</span>
                             {studentAnswer ? (
                                 studentAnswer.isCorrect ? (
-                                    <Tag color="green" icon={<CheckCircleOutlined />}>Đã nộp</Tag>
+                                    <Tag color="green" icon={<CheckCircleOutlined />}>Đúng</Tag>
                                 ) : (
-                                    <Tag color="red" icon={<CloseCircleOutlined />}>Chưa nộp</Tag>
+                                    <Tag color="red" icon={<CloseCircleOutlined />}>Sai</Tag>
                                 )
                             ) : (
                                 <Tag color="default">Chưa trả lời</Tag>
@@ -283,7 +328,13 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
                         </div>
                     }
                 >
-                    <p><strong>❓ Câu hỏi:</strong> {question.question}</p>
+                    <div style={{ marginBottom: 8 }}>
+                        <strong>❓ Câu hỏi:</strong>
+                        <div style={{ marginTop: 4 }}>
+                            {renderContent(question.question)}
+                        </div>
+                    </div>
+                    
                     {questionTypeLabel && (
                         <p><strong>📋 Loại:</strong> <Tag>{questionTypeLabel}</Tag></p>
                     )}
@@ -305,10 +356,12 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
                     )}
                     
                     {studentAnswer ? (
-                        <p style={{ marginTop: 8 }}>
-                            <strong>✍️ Câu trả lời của học viên:</strong> 
-                            <Tag color="blue">{studentAnswer.answer}</Tag>
-                        </p>
+                        <div style={{ marginTop: 8 }}>
+                            <strong>✍️ Câu trả lời của học viên:</strong>
+                            <div style={{ marginTop: 4 }}>
+                                {renderContent(studentAnswer.answer)}
+                            </div>
+                        </div>
                     ) : (
                         <p style={{ marginTop: 8, color: '#999' }}>
                             <em>Học viên chưa trả lời câu hỏi này</em>
@@ -387,21 +440,28 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
                                     key={task.id}
                                 >
                                     {task.description && (
-                                        <p><strong>📄 Mô tả:</strong> {task.description}</p>
+                                        <div style={{ marginBottom: 12 }}>
+                                            <strong>📄 Mô tả:</strong>
+                                            <div style={{ marginTop: 4 }}>
+                                                {renderContent(task.description)}
+                                            </div>
+                                        </div>
                                     )}
 
                                     {/* Render introduction */}
                                     {introItems && introItems.length > 0 && (
-                                        <div style={{ marginTop: 8 }}>
+                                        <div style={{ marginTop: 12, marginBottom: 12 }}>
                                             <strong>💡 Giới thiệu:</strong>
                                             {introItems.map((item, idx) => (
-                                                <div key={idx} style={{ marginTop: 8 }}>
-                                                    {item.title && <div style={{ fontWeight: 600, marginBottom: 6 }}>{item.title}</div>}
+                                                <div key={idx} style={{ marginTop: 8, padding: '8px', background: '#f5f5f5', borderRadius: '4px' }}>
+                                                    {item.title && (
+                                                        <div style={{ fontWeight: 600, marginBottom: 6, fontSize: '15px' }}>
+                                                            {item.title}
+                                                        </div>
+                                                    )}
                                                     {item.content && (
-                                                        <div>
-                                                            {String(item.content).split('\n').map((line, i) => (
-                                                                <p key={i} style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{line}</p>
-                                                            ))}
+                                                        <div style={{ marginTop: 4 }}>
+                                                            {renderContent(item.content)}
                                                         </div>
                                                     )}
                                                 </div>
@@ -441,20 +501,28 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
                                                             key={subtask.id}
                                                         >
                                                             {subtask.description && (
-                                                                <p><strong>Mô tả:</strong> {subtask.description}</p>
+                                                                <div style={{ marginBottom: 12 }}>
+                                                                    <strong>📄 Mô tả:</strong>
+                                                                    <div style={{ marginTop: 4 }}>
+                                                                        {renderContent(subtask.description)}
+                                                                    </div>
+                                                                </div>
                                                             )}
 
                                                             {/* Render subtask introduction */}
                                                             {subIntroItems && subIntroItems.length > 0 && (
-                                                                <div style={{ marginBottom: 8 }}>
+                                                                <div style={{ marginTop: 12, marginBottom: 12 }}>
+                                                                    <strong>💡 Giới thiệu:</strong>
                                                                     {subIntroItems.map((item, i) => (
-                                                                        <div key={i} style={{ marginTop: 8 }}>
-                                                                            {item.title && <div style={{ fontWeight: 600 }}>{item.title}</div>}
+                                                                        <div key={i} style={{ marginTop: 8, padding: '8px', background: '#f5f5f5', borderRadius: '4px' }}>
+                                                                            {item.title && (
+                                                                                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                                                                                    {item.title}
+                                                                                </div>
+                                                                            )}
                                                                             {item.content && (
-                                                                                <div>
-                                                                                    {String(item.content).split('\n').map((line, ii) => (
-                                                                                        <p key={ii} style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{line}</p>
-                                                                                    ))}
+                                                                                <div style={{ marginTop: 4 }}>
+                                                                                    {renderContent(item.content)}
                                                                                 </div>
                                                                             )}
                                                                         </div>

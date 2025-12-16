@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Card, Col, Row, Button, Input, Space, Modal, Divider, Tag, Collapse, Alert } from 'antd';
+import { Card, Col, Row, Button, Input, Space, Modal, Divider, Tag, Collapse, Alert, message } from 'antd';
 import { PlusOutlined, MinusCircleOutlined, EyeOutlined, BookOutlined } from '@ant-design/icons';
 import { useLocation } from 'react-router-dom';
 import ReactQuill from 'react-quill';
@@ -51,6 +51,7 @@ const TaskForm = (props) => {
     const [introductionSections, setIntroductionSections] = useState([
         { title: '', content: '' },
     ]);
+    const [submitError, setSubmitError] = useState(null);
 
     const { form, mixinFuncs, onValuesChange } = useBasicForm({
         onSubmit,
@@ -181,40 +182,63 @@ const TaskForm = (props) => {
         }));
     };
 
-    const handleSubmit = (values) => {
-        const normalizedIntroduction = normalizeIntroduction(introductionSections);
-        
-        const introductionJson = normalizedIntroduction.length > 0 
-            ? JSON.stringify(normalizedIntroduction) 
-            : null;
+    const handleSubmit = async (values) => {  // ← Thêm async ở đây!
+        try {
+            setSubmitError(null);
+            const normalizedIntroduction = normalizeIntroduction(introductionSections);
+            
+            const introductionJson = normalizedIntroduction.length > 0 
+                ? JSON.stringify(normalizedIntroduction) 
+                : null;
 
-        let taskName = values.name?.trim() || '';
-        
-        let submitData = {
-            name: taskName,
-            title: values.title?.trim() || '',
-            description: values.description?.trim() || '',
-            content: values.content?.trim() || null,
-            kind: isEditing ? dataDetail.kind : taskKind,
-            simulationId: simulationId || 0,
-            introduction: introductionJson,
-            imagePath: imagePath || null,
-            videoPath: videoPath || null,
-            filePath: filePath || null,
-        };
+            let taskName = values.name?.trim() || '';
+            
+            let submitData = {
+                name: taskName,
+                title: values.title?.trim() || '',
+                description: values.description?.trim() || '',
+                content: values.content?.trim() || null,
+                kind: isEditing ? dataDetail.kind : taskKind,
+                simulationId: simulationId || 0,
+                introduction: introductionJson,
+                imagePath: imagePath || null,
+                videoPath: videoPath || null,
+                filePath: filePath || null,
+            };
 
-        if (submitData.kind === TaskTypes.SUBTASK) {
-            if (parentTaskInfo) {
-                submitData.parentId = parseInt(parentTaskInfo.id);
-            } else if (dataDetail?.parent?.id) {
-                submitData.parentId = dataDetail.parent.id;
+            if (submitData.kind === TaskTypes.SUBTASK) {
+                if (parentTaskInfo) {
+                    submitData.parentId = parseInt(parentTaskInfo.id);
+                } else if (dataDetail?.parent?.id) {
+                    submitData.parentId = dataDetail.parent.id;
+                }
+            } else {
+                submitData.parentId = null;
             }
-        } else {
-            submitData.parentId = null;
-        }
 
-        console.log('📤 Submit Data:', JSON.stringify(submitData, null, 2));
-        return mixinFuncs.handleSubmit(submitData);
+            console.log('📤 Submit Data:', JSON.stringify(submitData, null, 2));
+            
+            const result = await mixinFuncs.handleSubmit(submitData);
+            
+            if (result && result.result === false) {
+                const errorMessage = result.message || 'Không thể lưu Task. Vui lòng thử lại.';
+                setSubmitError(errorMessage);
+                message.error(errorMessage);
+                return false;
+            }
+            
+            return result;
+
+        } catch (error) {
+            console.error('❌ Submit Error:', error);
+            const errorMessage = error?.response?.data?.message 
+                || error?.message 
+                || 'Có lỗi xảy ra khi lưu Task. Vui lòng kiểm tra lại thông tin.';
+            
+            setSubmitError(errorMessage);
+            message.error(errorMessage);
+            return false;
+        }
     };
 
     const getPreviewData = () => {
@@ -243,7 +267,8 @@ const TaskForm = (props) => {
                 : introData;
             
             if (!Array.isArray(parsed)) {
-                console.warn('Introduction is not an array');
+                console.warn('⚠️ Introduction is not an array');
+                message.warning('Dữ liệu giới thiệu không đúng định dạng');
                 return [{ title: '', content: '' }];
             }
             
@@ -257,27 +282,33 @@ const TaskForm = (props) => {
             
             return validParsed.length > 0 ? validParsed : [{ title: '', content: '' }];
         } catch (e) {
-            console.error('Error parsing introduction:', e);
+            console.error('❌ Error parsing introduction:', e);
+            message.error('Không thể đọc dữ liệu giới thiệu. Dữ liệu có thể bị lỗi.');
             return [{ title: '', content: '' }];
         }
     };
 
     useEffect(() => {
         if (dataDetail && Object.keys(dataDetail).length > 0) {
-            form.setFieldsValue({
-                name: dataDetail?.name || '',
-                title: dataDetail?.title || '',
-                description: dataDetail?.description || '',
-                content: dataDetail?.content || '',
-            });
-            
-            setImagePath(dataDetail?.imagePath || '');
-            setVideoPath(dataDetail?.videoPath || '');
-            setFilePath(dataDetail?.filePath || '');
-            setAutoNameGenerated(true);
+            try {
+                form.setFieldsValue({
+                    name: dataDetail?.name || '',
+                    title: dataDetail?.title || '',
+                    description: dataDetail?.description || '',
+                    content: dataDetail?.content || '',
+                });
+                
+                setImagePath(dataDetail?.imagePath || '');
+                setVideoPath(dataDetail?.videoPath || '');
+                setFilePath(dataDetail?.filePath || '');
+                setAutoNameGenerated(true);
 
-            const parsedIntro = parseIntroduction(dataDetail?.introduction);
-            setIntroductionSections(parsedIntro);
+                const parsedIntro = parseIntroduction(dataDetail?.introduction);
+                setIntroductionSections(parsedIntro);
+            } catch (error) {
+                console.error('❌ Error loading task detail:', error);
+                message.error('Không thể tải dữ liệu Task. Vui lòng tải lại trang.');
+            }
         }
     }, [dataDetail]);
 
@@ -291,6 +322,17 @@ const TaskForm = (props) => {
         <>
             <BaseForm id={formId} onFinish={handleSubmit} form={form} onValuesChange={onValuesChange}>
                 <Card className="card-form" bordered={false}>
+                    {submitError && (
+                        <Alert
+                            message="Lỗi khi lưu Task"
+                            description={submitError}
+                            type="error"
+                            showIcon
+                            closable
+                            onClose={() => setSubmitError(null)}
+                            style={{ marginBottom: 16 }}
+                        />
+                    )}
                     <Row gutter={16} style={{ marginBottom: 16 }}>
                         <Col span={24}>
                             <Alert

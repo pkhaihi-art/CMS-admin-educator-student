@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
+import { message, Alert } from 'antd';
 
 import PageWrapper from '@components/common/layout/PageWrapper';
 import apiConfig from '@constants/apiConfig';
@@ -21,7 +22,6 @@ const TaskSavePage = ({ pageOptions }) => {
     const location = useLocation();
     const isCreating = id === 'create';
     
-    // Lấy parentTask từ location.state
     const parentTaskFromState = location.state?.parentTask;
 
     const apiConfiguration = isEducator
@@ -52,18 +52,54 @@ const TaskSavePage = ({ pageOptions }) => {
                 simulationId: simulationId,
             });
 
-            funcs.mappingData = (data) => ({
-                ...data.data,
-            });
+            funcs.mappingData = (data) => {
+                // Kiểm tra data có hợp lệ không
+                if (!data || !data.data) {
+                    console.error('❌ Invalid data structure:', data);
+                    message.error('Không thể tải dữ liệu Task. Dữ liệu không hợp lệ.');
+                    return {};
+                }
+                return data.data;
+            };
+
+            // Thêm error handler cho getById
+            const originalGetDetail = funcs.getDetail;
+            funcs.getDetail = async (id) => {
+                try {
+                    return await originalGetDetail(id);
+                } catch (error) {
+                    console.error('❌ Error fetching task detail:', error);
+                    const errorMsg = error?.response?.data?.message 
+                        || error?.message 
+                        || 'Không thể tải thông tin Task. Vui lòng thử lại.';
+                    message.error(errorMsg);
+                    throw error;
+                }
+            };
         },
     });
 
-    // Tùy chỉnh title cho breadcrumb
+    // Kiểm tra detail khi load trang edit
+    useEffect(() => {
+        if (!isCreating && !loading && !detail) {
+            console.warn('⚠️ No task detail loaded for editing');
+            message.warning('Không tìm thấy thông tin Task. Vui lòng kiểm tra lại.');
+        }
+    }, [detail, loading, isCreating]);
+
+    // Kiểm tra simulationId có hợp lệ không
+    useEffect(() => {
+        if (!simulationId || simulationId === 'undefined') {
+            console.error('❌ Invalid simulationId:', simulationId);
+            message.error('Không xác định được Simulation ID. Vui lòng quay lại trang trước.');
+        }
+    }, [simulationId]);
+
     const getPageTitle = () => {
         if (isCreating) {
-            return parentTaskFromState ? 'Tạo Task Con' : 'Tạo Task';
+            return parentTaskFromState ? 'Tạo SubTask' : 'Tạo Task';
         }
-        return title;
+        return title || 'Chi tiết Task';
     };
 
     return (
@@ -71,15 +107,26 @@ const TaskSavePage = ({ pageOptions }) => {
             loading={loading}
             routes={pageOptions.renderBreadcrumbs(commonMessage, translate, getPageTitle(), { simulationId })}
         >
-            <TaskForm
-                setIsChangedFormValues={setIsChangedFormValues}
-                dataDetail={isCreating ? {} : detail || {}}
-                formId={mixinFuncs.getFormId()}
-                isEditing={isEditing}
-                actions={mixinFuncs.renderActions()}
-                onSubmit={onSave}
-                simulationId={simulationId}
-            />
+            {!loading && (isCreating || detail) ? (
+                <TaskForm
+                    setIsChangedFormValues={setIsChangedFormValues}
+                    dataDetail={isCreating ? {} : detail || {}}
+                    formId={mixinFuncs.getFormId()}
+                    isEditing={isEditing}
+                    actions={mixinFuncs.renderActions()}
+                    onSubmit={onSave}
+                    simulationId={simulationId}
+                />
+            ) : !loading ? (
+                <div style={{ padding: '24px', textAlign: 'center' }}>
+                    <Alert
+                        message="Không thể tải dữ liệu"
+                        description="Task không tồn tại hoặc bạn không có quyền truy cập. Vui lòng quay lại trang trước."
+                        type="error"
+                        showIcon
+                    />
+                </div>
+            ) : null}
         </PageWrapper>
     );
 };

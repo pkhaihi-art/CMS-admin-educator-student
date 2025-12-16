@@ -197,30 +197,17 @@ const SimulationForm = (props) => {
         return html || '<p><br></p>';
     };
 
-    // Convert HTML from Quill to plain text for JSON
-    const stripHtmlToPlainText = (html) => {
+    // Clean up Quill HTML - remove empty tags but keep the HTML structure
+    const cleanQuillHtml = (html) => {
         if (!html || html === '<p><br></p>') return '';
         
-        // Create a temporary div to parse HTML
-        const temp = document.createElement('div');
-        temp.innerHTML = html;
+        // Remove empty paragraphs at the end
+        let cleaned = html.trim();
         
-        // Handle lists specially
-        const lists = temp.querySelectorAll('ul, ol');
-        lists.forEach(list => {
-            const items = list.querySelectorAll('li');
-            items.forEach(item => {
-                item.textContent = '* ' + item.textContent + '\n';
-            });
-        });
+        // Remove trailing <p><br></p> or <p></p>
+        cleaned = cleaned.replace(/(<p><br><\/p>|<p><\/p>)+$/g, '');
         
-        // Get text content with line breaks preserved
-        let text = temp.textContent || temp.innerText || '';
-        
-        // Clean up extra whitespace but keep intentional line breaks
-        text = text.replace(/\n\s*\n/g, '\n').trim();
-        
-        return text;
+        return cleaned;
     };
 
     useEffect(() => {
@@ -251,19 +238,19 @@ const SimulationForm = (props) => {
     }, [dataDetail]);
 
     const handleSubmit = (values) => {
-        // Convert HTML content to plain text for JSON
-        const plainDescriptionContent = stripHtmlToPlainText(descriptionContent);
-        const plainOverviewContent = stripHtmlToPlainText(overviewContent);
+        // Keep HTML content - just clean it up
+        const cleanedDescriptionContent = cleanQuillHtml(descriptionContent);
+        const cleanedOverviewContent = cleanQuillHtml(overviewContent);
 
-        // Create JSON objects (as JSON strings)
+        // Create JSON objects with HTML content
         const descriptionJson = JSON.stringify({
             title: descriptionTitle || '',
-            content: plainDescriptionContent || '',
+            content: cleanedDescriptionContent || '',
         });
 
         const overviewJson = JSON.stringify([{
             title: overviewTitle || '',
-            content: plainOverviewContent || '',
+            content: cleanedOverviewContent || '',
         }]);
 
         console.log('📤 Sending data:', {
@@ -586,11 +573,11 @@ const SimulationPreviewModal = ({ visible, onClose, data }) => {
                         totalEstimatedTime: data.totalEstimatedTime,
                         description: JSON.stringify({
                             title: data.descriptionTitle || '',
-                            content: data.descriptionContent ? data.descriptionContent.replace(/<[^>]*>/g, ' ').trim() : '',
+                            content: data.descriptionContent || '',
                         }),
                         overview: JSON.stringify([{
                             title: data.overviewTitle || '',
-                            content: data.overviewContent ? data.overviewContent.replace(/<[^>]*>/g, ' ').trim() : '',
+                            content: data.overviewContent || '',
                         }]),
                         imagePath: data.imagePath || null,
                         videoPath: data.videoPath || null,
