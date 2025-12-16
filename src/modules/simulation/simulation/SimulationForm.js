@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Card, Col, Row, Button, Input, Space, Modal, Divider } from 'antd';
-import { PlusOutlined, MinusCircleOutlined, EyeOutlined } from '@ant-design/icons';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Card, Col, Row, Button, Space, Modal, Divider, Input } from 'antd';
+import { EyeOutlined } from '@ant-design/icons';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { BaseForm } from '@components/common/form/BaseForm';
 import CropImageField from '@components/common/form/CropImageField';
 import SelectField from '@components/common/form/SelectField';
@@ -12,8 +14,6 @@ import { AppConstants } from '@constants';
 import apiConfig from '@constants/apiConfig';
 import { commonMessage } from '@locales/intl';
 import FileUploadField from '@components/common/form/FileUploadField';
-
-const { TextArea } = Input;
 
 const SimulationForm = (props) => {
     const {
@@ -32,19 +32,36 @@ const SimulationForm = (props) => {
     const [videoPath, setVideoPath] = useState(null);
     const [previewVisible, setPreviewVisible] = useState(false);
 
-    // State cho Description (object)
+    // Description fields
     const [descriptionTitle, setDescriptionTitle] = useState('');
     const [descriptionContent, setDescriptionContent] = useState('');
 
-    // State cho Overview (array of objects)
-    const [overviewSections, setOverviewSections] = useState([
-        { title: '', content: '' },
-    ]);
+    // Overview fields
+    const [overviewTitle, setOverviewTitle] = useState('');
+    const [overviewContent, setOverviewContent] = useState('');
 
     const { execute: executeUpFile } = useFetch(apiConfig.file.upload, { immediate: false });
     const { form, mixinFuncs, onValuesChange } = useBasicForm({ onSubmit, setIsChangedFormValues });
 
-    // Upload file handler
+    const quillModules = useMemo(() => ({
+        toolbar: [
+            [{ 'header': [1, 2, 3, false] }],
+            ['bold', 'italic', 'underline', 'strike'],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            [{ 'color': [] }, { 'background': [] }],
+            ['link'],
+            ['clean'],
+        ],
+    }), []);
+
+    const quillFormats = [
+        'header',
+        'bold', 'italic', 'underline', 'strike',
+        'list', 'bullet',
+        'color', 'background',
+        'link',
+    ];
+
     const uploadFile = (file, onSuccess, onError, type) => {
         executeUpFile({
             data: { file, type },
@@ -65,7 +82,147 @@ const SimulationForm = (props) => {
         });
     };
 
-    // Parse data khi edit
+    const isJsonString = (str) => {
+        if (!str || typeof str !== 'string') return false;
+        const trimmed = str.trim();
+        if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return false;
+        try {
+            JSON.parse(str);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    };
+
+    // Parse JSON to extract title and content
+    const parseJsonData = (jsonData) => {
+        if (!jsonData) return { title: '', content: '' };
+        
+        // If already HTML, try to extract
+        if (!isJsonString(jsonData)) {
+            if (typeof jsonData === 'string' && jsonData.includes('<')) {
+                // Try to extract h2 and remaining content
+                const h2Match = jsonData.match(/<h2>(.*?)<\/h2>/);
+                const title = h2Match ? h2Match[1] : '';
+                const content = jsonData.replace(/<h2>.*?<\/h2>/, '').trim();
+                return { title, content };
+            }
+            return { title: '', content: jsonData };
+        }
+
+        try {
+            const parsed = JSON.parse(jsonData);
+            
+            // Format: {title: "...", content: "..."}
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                return {
+                    title: parsed.title || '',
+                    content: parsed.content || '',
+                };
+            }
+            
+            // Format: [{title: "...", content: "..."}, ...]
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                // Take first item as main, or combine all
+                if (parsed.length === 1) {
+                    return {
+                        title: parsed[0].title || '',
+                        content: parsed[0].content || '',
+                    };
+                } else {
+                    // Combine multiple sections into HTML
+                    let html = '';
+                    parsed.forEach((section, index) => {
+                        if (section.title && index > 0) {
+                            html += `<h3>${section.title}</h3>`;
+                        }
+                        if (section.content) {
+                            if (section.content.includes('<')) {
+                                html += section.content;
+                            } else {
+                                html += `<p>${section.content.replace(/\n/g, '<br>')}</p>`;
+                            }
+                        }
+                    });
+                    return {
+                        title: parsed[0].title || '',
+                        content: html,
+                    };
+                }
+            }
+            
+            return { title: '', content: '' };
+        } catch (e) {
+            console.error('Error parsing JSON:', e);
+            return { title: '', content: jsonData };
+        }
+    };
+
+    // Convert plain text content to HTML for Quill
+    const convertContentToHtml = (content) => {
+        if (!content) return '';
+        
+        // If already HTML
+        if (content.includes('<')) {
+            return content;
+        }
+        
+        // Convert plain text with bullets to HTML
+        const lines = content.split('\n').filter(line => line.trim());
+        let html = '';
+        let inList = false;
+        
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*')) {
+                if (!inList) {
+                    html += '<ul>';
+                    inList = true;
+                }
+                const text = trimmed.replace(/^[•\-*]\s*/, '');
+                html += `<li>${text}</li>`;
+            } else if (trimmed) {
+                if (inList) {
+                    html += '</ul>';
+                    inList = false;
+                }
+                html += `<p>${trimmed}</p>`;
+            }
+        });
+        
+        if (inList) {
+            html += '</ul>';
+        }
+        
+        return html || '<p><br></p>';
+    };
+
+    // Convert HTML from Quill to plain text for JSON
+    const stripHtmlToPlainText = (html) => {
+        if (!html || html === '<p><br></p>') return '';
+        
+        // Create a temporary div to parse HTML
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        
+        // Handle lists specially
+        const lists = temp.querySelectorAll('ul, ol');
+        lists.forEach(list => {
+            const items = list.querySelectorAll('li');
+            items.forEach(item => {
+                item.textContent = '* ' + item.textContent + '\n';
+            });
+        });
+        
+        // Get text content with line breaks preserved
+        let text = temp.textContent || temp.innerText || '';
+        
+        // Clean up extra whitespace but keep intentional line breaks
+        text = text.replace(/\n\s*\n/g, '\n').trim();
+        
+        return text;
+    };
+
     useEffect(() => {
         if (dataDetail && Object.keys(dataDetail).length > 0) {
             form.setFieldsValue({
@@ -75,76 +232,45 @@ const SimulationForm = (props) => {
             setImagePath(dataDetail.imagePath);
             setVideoPath(dataDetail.videoPath);
 
-            // Parse description
+            // Parse Description
             if (dataDetail.description) {
-                try {
-                    const desc = typeof dataDetail.description === 'string'
-                        ? JSON.parse(dataDetail.description)
-                        : dataDetail.description;
-                    setDescriptionTitle(desc.title || '');
-                    setDescriptionContent(desc.content || '');
-                } catch (e) {
-                    console.error('Error parsing description:', e);
-                }
+                const descData = parseJsonData(dataDetail.description);
+                console.log('📝 Description parsed:', descData);
+                setDescriptionTitle(descData.title);
+                setDescriptionContent(convertContentToHtml(descData.content));
             }
 
-            // Parse overview
+            // Parse Overview
             if (dataDetail.overview) {
-                try {
-                    const overview = typeof dataDetail.overview === 'string'
-                        ? JSON.parse(dataDetail.overview)
-                        : dataDetail.overview;
-                    if (Array.isArray(overview) && overview.length > 0) {
-                        setOverviewSections(overview);
-                    } else {
-                        setOverviewSections([{ title: '', content: '' }]);
-                    }
-                } catch (e) {
-                    console.error('Error parsing overview:', e);
-                    setOverviewSections([{ title: '', content: '' }]);
-                }
+                const overviewData = parseJsonData(dataDetail.overview);
+                console.log('📋 Overview parsed:', overviewData);
+                setOverviewTitle(overviewData.title);
+                setOverviewContent(convertContentToHtml(overviewData.content));
             }
         }
-    }, [dataDetail, specializations]);
+    }, [dataDetail]);
 
-    // Thêm overview section
-    const addOverviewSection = () => {
-        setOverviewSections([...overviewSections, { title: '', content: '' }]);
-        setIsChangedFormValues(true);
-    };
-
-    // Xóa overview section
-    const removeOverviewSection = (index) => {
-        const newSections = overviewSections.filter((_, i) => i !== index);
-        setOverviewSections(newSections.length > 0 ? newSections : [{ title: '', content: '' }]);
-        setIsChangedFormValues(true);
-    };
-
-    // Update overview section
-    const updateOverviewSection = (index, field, value) => {
-        const newSections = [...overviewSections];
-        newSections[index] = {
-            ...newSections[index],
-            [field]: value,
-        };
-        setOverviewSections(newSections);
-        setIsChangedFormValues(true);
-    };
-
-    // Submit handler
     const handleSubmit = (values) => {
-        // Tạo description JSON string đúng format
-        const descriptionObj = {
-            title: descriptionTitle,
-            content: descriptionContent,
-        };
-        const descriptionJson = JSON.stringify(descriptionObj);
+        // Convert HTML content to plain text for JSON
+        const plainDescriptionContent = stripHtmlToPlainText(descriptionContent);
+        const plainOverviewContent = stripHtmlToPlainText(overviewContent);
 
-        // Tạo overview JSON string - filter out empty sections
-        const validOverviewSections = overviewSections.filter(
-            section => section.title.trim() || section.content.trim(),
-        );
-        const overviewJson = JSON.stringify(validOverviewSections);
+        // Create JSON objects (as JSON strings)
+        const descriptionJson = JSON.stringify({
+            title: descriptionTitle || '',
+            content: plainDescriptionContent || '',
+        });
+
+        const overviewJson = JSON.stringify([{
+            title: overviewTitle || '',
+            content: plainOverviewContent || '',
+        }]);
+
+        console.log('📤 Sending data:', {
+            ...values,
+            description: descriptionJson,
+            overview: overviewJson,
+        });
 
         mixinFuncs.handleSubmit({
             ...values,
@@ -155,23 +281,16 @@ const SimulationForm = (props) => {
         });
     };
 
-    // Format content với bullet points để hiển thị đúng
-    const formatContentForInput = (content) => {
-        return content;
-    };
-
-    // Get current form data for preview
     const getPreviewData = () => {
         const formValues = form.getFieldsValue();
         return {
             ...formValues,
             imagePath,
             videoPath,
-            description: {
-                title: descriptionTitle,
-                content: descriptionContent,
-            },
-            overview: overviewSections,
+            descriptionTitle,
+            descriptionContent,
+            overviewTitle,
+            overviewContent,
             specialization: specializations?.find(s => s.value === formValues.specializationId),
             level: levels?.find(l => l.value === formValues.level),
         };
@@ -181,7 +300,6 @@ const SimulationForm = (props) => {
         <>
             <BaseForm id={formId} onFinish={handleSubmit} form={form} onValuesChange={onValuesChange}>
                 <Card className="card-form" bordered={false}>
-                    {/* Basic Info */}
                     <Row gutter={16}>
                         <Col span={12}>
                             <TextField
@@ -223,7 +341,7 @@ const SimulationForm = (props) => {
 
                     <Divider orientation="left">Mô tả khóa học</Divider>
 
-                    {/* Description Section */}
+                    {/* Description Title */}
                     <Row gutter={16}>
                         <Col span={24}>
                             <div style={{ marginBottom: 16 }}>
@@ -231,114 +349,102 @@ const SimulationForm = (props) => {
                                     Tiêu đề mô tả <span style={{ color: 'red' }}>*</span>
                                 </label>
                                 <Input
-                                    placeholder="VD: Giới thiệu về hoạt động học tập"
                                     value={descriptionTitle}
                                     onChange={(e) => {
                                         setDescriptionTitle(e.target.value);
                                         setIsChangedFormValues(true);
                                     }}
+                                    placeholder="VD: Tại sao phải hoàn thành Mô phỏng công việc này"
+                                    size="large"
                                 />
                             </div>
                         </Col>
                     </Row>
 
+                    {/* Description Content */}
                     <Row gutter={16}>
                         <Col span={24}>
                             <div style={{ marginBottom: 16 }}>
                                 <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
                                     Nội dung mô tả <span style={{ color: 'red' }}>*</span>
                                 </label>
-                                <TextArea
-                                    rows={4}
-                                    placeholder="Mô tả chi tiết về khóa học..."
+                                <ReactQuill
+                                    theme="snow"
                                     value={descriptionContent}
-                                    onChange={(e) => {
-                                        setDescriptionContent(e.target.value);
+                                    onChange={(value) => {
+                                        setDescriptionContent(value);
                                         setIsChangedFormValues(true);
                                     }}
+                                    modules={quillModules}
+                                    formats={quillFormats}
+                                    placeholder="Nhập nội dung mô tả chi tiết về khóa học..."
+                                    style={{ 
+                                        background: 'white',
+                                        borderRadius: '4px',
+                                        minHeight: '200px',
+                                    }}
                                 />
+                                <div style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
+                                    💡 Tip: Sử dụng thanh công cụ để định dạng text, tạo heading, bullet list, và nhiều hơn nữa.
+                                </div>
                             </div>
                         </Col>
                     </Row>
 
                     <Divider orientation="left">Tổng quan khóa học</Divider>
 
-                    {/* Overview Sections */}
-                    {overviewSections.map((section, index) => (
-                        <Card
-                            key={index}
-                            size="small"
-                            style={{ marginBottom: 16, background: '#fafafa' }}
-                            extra={
-                                overviewSections.length > 1 && (
-                                    <Button
-                                        type="text"
-                                        danger
-                                        icon={<MinusCircleOutlined />}
-                                        onClick={() => removeOverviewSection(index)}
-                                    >
-                                        Xóa
-                                    </Button>
-                                )
-                            }
-                            title={`Phần ${index + 1}`}
-                        >
-                            <Row gutter={16}>
-                                <Col span={24}>
-                                    <div style={{ marginBottom: 12 }}>
-                                        <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
-                                            Tiêu đề phần
-                                        </label>
-                                        <Input
-                                            placeholder="VD: Bạn sẽ học được gì"
-                                            value={section.title}
-                                            onChange={(e) => updateOverviewSection(index, 'title', e.target.value)}
-                                        />
-                                    </div>
-                                </Col>
-                            </Row>
-                            <Row gutter={16}>
-                                <Col span={24}>
-                                    <div>
-                                        <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
-                                            Nội dung
-                                        </label>
-                                        <TextArea
-                                            rows={8}
-                                            placeholder={`Nhập nội dung, sử dụng ký tự • để tạo bullet point. VD:
-Sau khi hoàn thành khóa học này, bạn sẽ có thể:
- • Mô tả các chức năng cơ bản của máy tính
- • Phân biệt giữa phần cứng và phần mềm
- • Mô tả các loại ngôn ngữ lập trình`}
-                                            value={section.content}
-                                            onChange={(e) => updateOverviewSection(index, 'content', e.target.value)}
-                                        />
-                                        <div style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
-                                            💡 Tip: Sử dụng ký tự • (Alt+7 hoặc copy) để tạo bullet point. Mỗi dòng bắt đầu bằng • sẽ được hiển thị như danh sách.
-                                        </div>
-                                    </div>
-                                </Col>
-                            </Row>
-                        </Card>
-                    ))}
-
-                    <Row>
+                    {/* Overview Title */}
+                    <Row gutter={16}>
                         <Col span={24}>
-                            <Button
-                                type="dashed"
-                                onClick={addOverviewSection}
-                                block
-                                icon={<PlusOutlined />}
-                                style={{ marginBottom: 16 }}
-                            >
-                                Thêm phần tổng quan
-                            </Button>
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
+                                    Tiêu đề tổng quan <span style={{ color: 'red' }}>*</span>
+                                </label>
+                                <Input
+                                    value={overviewTitle}
+                                    onChange={(e) => {
+                                        setOverviewTitle(e.target.value);
+                                        setIsChangedFormValues(true);
+                                    }}
+                                    placeholder="VD: Nó hoạt động như thế nào"
+                                    size="large"
+                                />
+                            </div>
+                        </Col>
+                    </Row>
+
+                    {/* Overview Content */}
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
+                                    Nội dung tổng quan <span style={{ color: 'red' }}>*</span>
+                                </label>
+                                <ReactQuill
+                                    theme="snow"
+                                    value={overviewContent}
+                                    onChange={(value) => {
+                                        setOverviewContent(value);
+                                        setIsChangedFormValues(true);
+                                    }}
+                                    modules={quillModules}
+                                    formats={quillFormats}
+                                    placeholder="Nhập nội dung tổng quan về khóa học..."
+                                    style={{ 
+                                        background: 'white',
+                                        borderRadius: '4px',
+                                        minHeight: '200px',
+                                    }}
+                                />
+                                <div style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
+                                    💡 Tip: Sử dụng thanh công cụ để định dạng text, tạo bullet list, numbered list, và nhiều hơn nữa.
+                                </div>
+                            </div>
                         </Col>
                     </Row>
 
                     <Divider orientation="left">Media</Divider>
 
-                    {/* Media */}
                     <Row gutter={16}>
                         <Col span={12}>
                             <CropImageField
@@ -377,7 +483,6 @@ Sau khi hoàn thành khóa học này, bạn sẽ có thể:
                 </Card>
             </BaseForm>
 
-            {/* Preview Modal */}
             <SimulationPreviewModal
                 visible={previewVisible}
                 onClose={() => setPreviewVisible(false)}
@@ -387,44 +492,7 @@ Sau khi hoàn thành khóa học này, bạn sẽ có thể:
     );
 };
 
-// Component Preview Modal
 const SimulationPreviewModal = ({ visible, onClose, data }) => {
-    // Format content với bullet points và newlines
-    const formatContent = (content) => {
-        if (!content) return null;
-        
-        const lines = content.split('\n');
-        return (
-            <div>
-                {lines.map((line, i) => {
-                    const trimmedLine = line.trim();
-                    
-                    // Kiểm tra nếu dòng bắt đầu bằng bullet point
-                    if (trimmedLine.startsWith('•')) {
-                        return (
-                            <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px', paddingLeft: '8px' }}>
-                                <span style={{ color: '#1890ff' }}>•</span>
-                                <span>{trimmedLine.substring(1).trim()}</span>
-                            </div>
-                        );
-                    }
-                    
-                    // Dòng trống
-                    if (!trimmedLine) {
-                        return <div key={i} style={{ height: '8px' }} />;
-                    }
-                    
-                    // Dòng text thường
-                    return (
-                        <p key={i} style={{ marginBottom: '8px', fontWeight: line.includes(':') ? 500 : 400 }}>
-                            {trimmedLine}
-                        </p>
-                    );
-                })}
-            </div>
-        );
-    };
-
     return (
         <Modal
             title="Xem trước Simulation"
@@ -438,7 +506,6 @@ const SimulationPreviewModal = ({ visible, onClose, data }) => {
             ]}
         >
             <div style={{ maxHeight: '70vh', overflowY: 'auto', padding: '16px' }}>
-                {/* Header */}
                 <div style={{ marginBottom: 24 }}>
                     <h2 style={{ marginBottom: 8 }}>{data.title || 'Chưa có tiêu đề'}</h2>
                     <Space wrap>
@@ -461,7 +528,6 @@ const SimulationPreviewModal = ({ visible, onClose, data }) => {
                     </Space>
                 </div>
 
-                {/* Image */}
                 {data.imagePath && (
                     <img
                         src={`${AppConstants.contentRootUrl}${data.imagePath}`}
@@ -470,36 +536,38 @@ const SimulationPreviewModal = ({ visible, onClose, data }) => {
                     />
                 )}
 
-                {/* Description */}
-                {data.description && (data.description.title || data.description.content) && (
-                    <Card 
-                        title={data.description.title || 'Mô tả'} 
-                        style={{ marginBottom: 16 }}
-                    >
-                        <p style={{ lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>
-                            {data.description.content}
-                        </p>
+                {/* Description Preview */}
+                {(data.descriptionTitle || data.descriptionContent) && (
+                    <Card title="Mô tả khóa học" style={{ marginBottom: 16 }}>
+                        {data.descriptionTitle && (
+                            <h2 style={{ marginTop: 0, marginBottom: 16 }}>{data.descriptionTitle}</h2>
+                        )}
+                        {data.descriptionContent && data.descriptionContent !== '<p><br></p>' && (
+                            <div 
+                                className="ql-editor" 
+                                style={{ padding: 0 }}
+                                dangerouslySetInnerHTML={{ __html: data.descriptionContent }}
+                            />
+                        )}
                     </Card>
                 )}
 
-                {/* Overview */}
-                {data.overview && data.overview.length > 0 && data.overview.some(s => s.title || s.content) && (
-                    <>
-                        {data.overview
-                            .filter(section => section.title || section.content)
-                            .map((section, index) => (
-                                <Card 
-                                    key={index} 
-                                    title={section.title || `Phần ${index + 1}`} 
-                                    style={{ marginBottom: 16 }}
-                                >
-                                    {formatContent(section.content)}
-                                </Card>
-                            ))}
-                    </>
+                {/* Overview Preview */}
+                {(data.overviewTitle || data.overviewContent) && (
+                    <Card title="Tổng quan khóa học" style={{ marginBottom: 16 }}>
+                        {data.overviewTitle && (
+                            <h3 style={{ marginTop: 0, marginBottom: 16 }}>{data.overviewTitle}</h3>
+                        )}
+                        {data.overviewContent && data.overviewContent !== '<p><br></p>' && (
+                            <div 
+                                className="ql-editor" 
+                                style={{ padding: 0 }}
+                                dangerouslySetInnerHTML={{ __html: data.overviewContent }}
+                            />
+                        )}
+                    </Card>
                 )}
 
-                {/* JSON Preview for debugging */}
                 <Divider orientation="left" style={{ fontSize: 12, color: '#999' }}>
                     JSON Output (Debug)
                 </Divider>
@@ -517,12 +585,13 @@ const SimulationPreviewModal = ({ visible, onClose, data }) => {
                         level: typeof data.level === 'object' ? data.level.value : data.level,
                         totalEstimatedTime: data.totalEstimatedTime,
                         description: JSON.stringify({
-                            title: data.description?.title,
-                            content: data.description?.content,
+                            title: data.descriptionTitle || '',
+                            content: data.descriptionContent ? data.descriptionContent.replace(/<[^>]*>/g, ' ').trim() : '',
                         }),
-                        overview: JSON.stringify(
-                            data.overview?.filter(s => s.title || s.content) || [],
-                        ),
+                        overview: JSON.stringify([{
+                            title: data.overviewTitle || '',
+                            content: data.overviewContent ? data.overviewContent.replace(/<[^>]*>/g, ' ').trim() : '',
+                        }]),
                         imagePath: data.imagePath || null,
                         videoPath: data.videoPath || null,
                     }, null, 2)}

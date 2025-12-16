@@ -92,6 +92,12 @@ export const navMenuConfig = [
                 path: routes.specializationListPage.path,
                 permission: [apiConfig.specialization.getList.permissionCode],
             },
+            {
+                label: <FormattedMessage defaultMessage="Test" />,
+                key: 'test',
+                path: routes.testPage.path,
+                permission: [apiConfig.specialization.getList.permissionCode],
+            },
         ],
     },
     {

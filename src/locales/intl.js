@@ -1,6 +1,7 @@
 import { defineMessages } from 'react-intl';
 
 export const commonMessage = defineMessages({
+    test: 'Kiểm tra',
     level_1: 'Cơ bản',
     level_2: 'Trung cấp',
     level_3: 'Nâng cao',

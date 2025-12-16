@@ -8,6 +8,7 @@ import TaskListPage from '@modules/simulation/task';
 import TaskSavePage from '@modules/simulation/task/TaskSavePage';
 import TaskQuestionListPage from '@modules/simulation/taskQuestion';
 import TaskQuestionSavePage from '@modules/simulation/taskQuestion/TaskQuestionSavePage';
+import TestPage from '@modules/simulation/test';
 
 const paths = {
     // Simulation paths
@@ -19,6 +20,9 @@ const paths = {
     taskSavePage: '/simulation/:simulationId/task/:id',
     taskQuestionListPage: '/simulation/:simulationId/task/:taskId/question',
     taskQuestionSavePage: '/simulation/:simulationId/task/:taskId/question/:id',
+
+    //Test Page
+    testPage: '/simulation/test',
 };
 
 export default {
@@ -117,6 +121,20 @@ export default {
                     { breadcrumbName: title },
                 ];
             },
+        },
+    },
+
+    // ==================== TEST PAGE ====================
+    testPage: {
+        path: paths.testPage,
+        auth: true,
+        component: TestPage,
+        permissions: [],
+        pageOptions: {
+            objectName: commonMessage.test,
+            renderBreadcrumbs: (messages, t) => [
+                { breadcrumbName: t.formatMessage(commonMessage.test) },
+            ],
         },
     },
 };

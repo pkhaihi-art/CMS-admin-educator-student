@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Card, Col, Row, Button, Input, Space, Modal, Divider, Tag, Collapse, Alert } from 'antd';
 import { PlusOutlined, MinusCircleOutlined, EyeOutlined, BookOutlined } from '@ant-design/icons';
 import { useLocation } from 'react-router-dom';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 import { BaseForm } from '@components/common/form/BaseForm';
 import CropImageField from '@components/common/form/CropImageField';
 import TextField from '@components/common/form/TextField';
-import NumericField from '@components/common/form/NumericField';
 
 import useBasicForm from '@hooks/useBasicForm';
 import useFetch from '@hooks/useFetch';
@@ -17,7 +18,6 @@ import apiConfig from '@constants/apiConfig';
 import { taskKindOptions } from '@constants/masterData';
 import { commonMessage } from '@locales/intl';
 
-const { TextArea } = Input;
 const { Panel } = Collapse;
 
 const TaskForm = (props) => {
@@ -25,7 +25,6 @@ const TaskForm = (props) => {
     const kindValues = translate.formatKeys(taskKindOptions, ['label']);
     const location = useLocation();
     
-    // Lấy parentTask từ location.state
     const parentTaskFromState = location.state?.parentTask;
 
     const {
@@ -58,32 +57,46 @@ const TaskForm = (props) => {
         setIsChangedFormValues,
     });
 
-    // Xác định loại task và parent info từ location.state hoặc dataDetail
+    // Quill configuration
+    const quillModules = useMemo(() => ({
+        toolbar: [
+            [{ 'header': [1, 2, 3, false] }],
+            ['bold', 'italic', 'underline', 'strike'],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            [{ 'color': [] }, { 'background': [] }],
+            ['link'],
+            ['clean'],
+        ],
+    }), []);
+
+    const quillFormats = [
+        'header',
+        'bold', 'italic', 'underline', 'strike',
+        'list', 'bullet',
+        'color', 'background',
+        'link',
+    ];
+
     useEffect(() => {
         console.log('Parent Info from location.state:', parentTaskFromState);
         console.log('Is Editing:', isEditing);
         console.log('Data Detail:', dataDetail);
         
         if (!isEditing) {
-            // Khi tạo mới
             if (parentTaskFromState) {
-                // Đang tạo SubTask
                 setTaskKind(TaskTypes.SUBTASK);
                 setParentTaskInfo(parentTaskFromState);
                 
-                // Set name ngay lập tức cho SubTask = tên của Task cha
                 setTimeout(() => {
                     form.setFieldsValue({ name: parentTaskFromState.name });
                     console.log('Set form name from state:', parentTaskFromState.name);
                 }, 100);
                 setAutoNameGenerated(true);
             } else {
-                // Đang tạo Task
                 setTaskKind(TaskTypes.TASK);
                 setParentTaskInfo(null);
             }
         } else {
-            // Khi edit, lấy thông tin từ dataDetail
             if (dataDetail?.kind === TaskTypes.SUBTASK && dataDetail?.parent) {
                 setTaskKind(TaskTypes.SUBTASK);
                 setParentTaskInfo(dataDetail.parent);
@@ -94,7 +107,6 @@ const TaskForm = (props) => {
         }
     }, [parentTaskFromState, isEditing, dataDetail]);
 
-    // Generate auto name cho Task (không phải SubTask)
     const generateAutoName = async () => {
         if (isEditing || autoNameGenerated || taskKind !== TaskTypes.TASK) return;
 
@@ -117,7 +129,6 @@ const TaskForm = (props) => {
         }
     };
 
-    // Chỉ generate auto name cho Task (kind = 1)
     useEffect(() => {
         if (taskKind === TaskTypes.TASK && !isEditing && !autoNameGenerated) {
             generateAutoName();
@@ -160,10 +171,14 @@ const TaskForm = (props) => {
 
     const normalizeIntroduction = (sections) => {
         const validSections = sections.filter(
-            section => section.title.trim() !== '' || section.content.trim() !== '',
+            section => section.title.trim() !== '' || (section.content && section.content !== '<p><br></p>'),
         );
         
-        return validSections;
+        // Content is already in HTML format from ReactQuill
+        return validSections.map(section => ({
+            title: section.title.trim(),
+            content: section.content || '',
+        }));
     };
 
     const handleSubmit = (values) => {
@@ -171,7 +186,7 @@ const TaskForm = (props) => {
         
         const introductionJson = normalizedIntroduction.length > 0 
             ? JSON.stringify(normalizedIntroduction) 
-            : '';
+            : null;
 
         let taskName = values.name?.trim() || '';
         
@@ -179,27 +194,26 @@ const TaskForm = (props) => {
             name: taskName,
             title: values.title?.trim() || '',
             description: values.description?.trim() || '',
-            content: values.content?.trim() || '',
+            content: values.content?.trim() || null,
             kind: isEditing ? dataDetail.kind : taskKind,
-            maxErrors: values.maxErrors || 0,
             simulationId: simulationId || 0,
             introduction: introductionJson,
-            imagePath: imagePath || '',
-            videoPath: videoPath || '',
-            filePath: filePath || '',
+            imagePath: imagePath || null,
+            videoPath: videoPath || null,
+            filePath: filePath || null,
         };
 
-        // Thêm parentId nếu là SubTask
         if (submitData.kind === TaskTypes.SUBTASK) {
             if (parentTaskInfo) {
                 submitData.parentId = parseInt(parentTaskInfo.id);
             } else if (dataDetail?.parent?.id) {
                 submitData.parentId = dataDetail.parent.id;
             }
+        } else {
+            submitData.parentId = null;
         }
 
-        console.log('Submit Data:', JSON.stringify(submitData, null, 2));
-
+        console.log('📤 Submit Data:', JSON.stringify(submitData, null, 2));
         return mixinFuncs.handleSubmit(submitData);
     };
 
@@ -233,9 +247,13 @@ const TaskForm = (props) => {
                 return [{ title: '', content: '' }];
             }
             
+            // Content is already in HTML format, no conversion needed
             const validParsed = parsed.filter(
                 item => item && typeof item === 'object' && 'title' in item && 'content' in item,
-            );
+            ).map(item => ({
+                title: item.title || '',
+                content: item.content || '',
+            }));
             
             return validParsed.length > 0 ? validParsed : [{ title: '', content: '' }];
         } catch (e) {
@@ -251,7 +269,6 @@ const TaskForm = (props) => {
                 title: dataDetail?.title || '',
                 description: dataDetail?.description || '',
                 content: dataDetail?.content || '',
-                maxErrors: dataDetail?.maxErrors || 0,
             });
             
             setImagePath(dataDetail?.imagePath || '');
@@ -326,18 +343,6 @@ const TaskForm = (props) => {
 
                     <Row gutter={16}>
                         <Col span={24}>
-                            <NumericField
-                                label="Số lỗi tối đa"
-                                name="maxErrors"
-                                min={0}
-                                max={100}
-                                placeholder="0"
-                            />
-                        </Col>
-                    </Row>
-
-                    <Row gutter={16}>
-                        <Col span={24}>
                             <TextField
                                 label="Mô tả"
                                 required
@@ -384,14 +389,15 @@ const TaskForm = (props) => {
                         >
                             <Row gutter={16}>
                                 <Col span={24}>
-                                    <div style={{ marginBottom: 12 }}>
+                                    <div style={{ marginBottom: 16 }}>
                                         <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
                                             Tiêu đề phần
                                         </label>
                                         <Input
-                                            placeholder="VD: Mục tiêu học tập"
+                                            placeholder="VD: Vai trò của bạn"
                                             value={section.title}
                                             onChange={(e) => updateIntroductionSection(index, 'title', e.target.value)}
+                                            size="large"
                                         />
                                     </div>
                                 </Col>
@@ -401,14 +407,24 @@ const TaskForm = (props) => {
                                 <Col span={24}>
                                     <div>
                                         <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
-                                            Nội dung (mỗi dòng là một mục)
+                                            Nội dung
                                         </label>
-                                        <TextArea
-                                            rows={6}
-                                            placeholder="Nhập nội dung, mỗi dòng bắt đầu bằng • sẽ là bullet point. VD:&#10;Sau khi hoàn thành bài học này, bạn sẽ có thể:&#10; • Giải thích bốn chức năng cơ bản của máy tính&#10; • Phân biệt giữa phần cứng và phần mềm"
+                                        <ReactQuill
+                                            theme="snow"
                                             value={section.content}
-                                            onChange={(e) => updateIntroductionSection(index, 'content', e.target.value)}
+                                            onChange={(value) => updateIntroductionSection(index, 'content', value)}
+                                            modules={quillModules}
+                                            formats={quillFormats}
+                                            placeholder="Nhập nội dung chi tiết, sử dụng toolbar để format..."
+                                            style={{ 
+                                                background: 'white',
+                                                borderRadius: '4px',
+                                                minHeight: '200px',
+                                            }}
                                         />
+                                        <div style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
+                                            💡 Tip: Sử dụng toolbar để tạo bullet list, numbered list, bold, italic, và nhiều hơn nữa.
+                                        </div>
                                     </div>
                                 </Col>
                             </Row>
@@ -491,23 +507,6 @@ const TaskForm = (props) => {
 };
 
 const TaskPreviewModal = ({ visible, onClose, data }) => {
-    const formatContent = (content) => {
-        if (!content) return null;
-        const lines = content.split('\n');
-        return lines.map((line, i) => {
-            const trimmedLine = line.trim();
-            if (trimmedLine.startsWith('•')) {
-                return (
-                    <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ color: '#1890ff', marginTop: '4px' }}>•</span>
-                        <span>{trimmedLine.substring(1).trim()}</span>
-                    </div>
-                );
-            }
-            return trimmedLine ? <p key={i} style={{ marginBottom: '8px' }}>{trimmedLine}</p> : null;
-        });
-    };
-
     return (
         <Modal
             title={
@@ -561,11 +560,6 @@ const TaskPreviewModal = ({ visible, onClose, data }) => {
                                     {data.kind.label}
                                 </Tag>
                             )}
-                            {data.maxErrors > 0 && (
-                                <Tag color="orange">
-                                    Tối đa {data.maxErrors} lỗi
-                                </Tag>
-                            )}
                         </Space>
                     </div>
 
@@ -617,9 +611,11 @@ const TaskPreviewModal = ({ visible, onClose, data }) => {
                                     overflow: 'hidden',
                                 }}
                             >
-                                <div style={{ padding: '8px 0' }}>
-                                    {formatContent(section.content)}
-                                </div>
+                                <div 
+                                    className="ql-editor" 
+                                    style={{ padding: '8px 0' }}
+                                    dangerouslySetInnerHTML={{ __html: section.content }}
+                                />
                             </Panel>
                         ))}
                     </Collapse>

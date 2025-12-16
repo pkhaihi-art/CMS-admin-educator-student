@@ -76,6 +76,7 @@ const TaskListPage = ({ pageOptions }) => {
             funcs.prepareGetListParams = (params) => ({
                 ...params,
                 simulationId: simulationId,
+                size: 1000,
             });
 
             funcs.renderKindColumn = (columnsProps) => ({
