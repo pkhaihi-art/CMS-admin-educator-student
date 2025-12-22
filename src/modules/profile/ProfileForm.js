@@ -7,62 +7,78 @@ import { defineMessages } from 'react-intl';
 import useTranslate from '@hooks/useTranslate';
 import { Card, Form } from 'antd';
 import usePasswordValidation from '@hooks/usePasswordValidation'; 
-import { DEFAULT_FORMAT } from '@constants';
+import { DEFAULT_FORMAT, UserTypes, storageKeys } from '@constants';
+import { getData } from '@utils/localStorage';
 
 const messages = defineMessages({
-    banner: 'Banner',
-    avatarPath: 'Avatar',
     username: 'Username',
-    career: 'Career Name',
-    fullName: 'Leader',
+    fullName: 'Full Name',
     email: 'Email',
-    hotline: 'Hot line',
     phoneNumber: 'Phone Number',
     birthday: 'Birthday',
-    taxNumber: 'Tax Number',
-    zipCode: 'Zip Code',
-    city: 'City',
-    address: 'Address',
-    logo: 'Logo',
+    avatar: 'Avatar',
     currentPassword: 'Current password',
     newPassword: 'New password',
     confirmPassword: 'Confirm password',
-    passwordLengthError: 'Password must be at least 6 characters',
-    passwordMatchError: 'Password does not match',
 });
 
 const ProfileForm = (props) => {
     const { formId, dataDetail, onSubmit, setIsChangedFormValues, actions } = props;
-
     const translate = useTranslate();
+    
+    const userType = getData(storageKeys.USER_TYPE);
+    const isAdmin = userType === UserTypes.ADMIN;
 
     const { form, mixinFuncs, onValuesChange } = useBasicForm({
         onSubmit,
         setIsChangedFormValues,
     });
 
-    // ✔️ Sử dụng hook kiểm tra mật khẩu (min = 6 ký tự để phù hợp rule cũ)
     const { passwordRules, confirmPasswordRules } = usePasswordValidation(6);
 
     useEffect(() => {
         if (dataDetail) {
             form.setFieldsValue({
                 ...dataDetail,
-                birthday: dataDetail.birthday
-                    ? dayjs(dataDetail.birthday, DEFAULT_FORMAT)
-                    : null,
+                // Ưu tiên lấy fullName từ dataDetail để hiển thị lên ô input có name="fullName"
+                fullName: dataDetail.fullName,
+                avatar: dataDetail.avatar || dataDetail.avatarPath,
+                birthday: dataDetail.birthday ? dayjs(dataDetail.birthday) : null,
             });
         }
-    }, [dataDetail]);
+    }, [dataDetail, form]);
 
     const handleFinish = (values) => {
-        mixinFuncs.handleSubmit({
+        // Khởi tạo payload cơ bản
+        const payload = {
             ...values,
-            fullName: values.fullName,
-            oldPassword: values.oldPassword,
-            password: values.password,
-        });
+            id: dataDetail?.id,
+            avatarPath: values.avatar,
+            birthday: values.birthday ? values.birthday.format(DEFAULT_FORMAT) : null,
+        };
+
+        if (isAdmin) {
+            // 1. Nếu là ADMIN: API yêu cầu key "fullName"
+            // Vì TextField đang có name="fullName" nên values.fullName đã tồn tại trong ...values
+            payload.fullName = values.fullName;
+            payload.oldPassword = values.oldPassword;
+            payload.password = values.newPassword; // Map newPassword vào key password của Admin API
+        } else {
+            // 2. Nếu là STUDENT/EDUCATOR: API yêu cầu key "fullname" (viết thường)
+            payload.fullname = values.fullName;
+            // Xóa fullName (CamelCase) để tránh gửi thừa 2 field lên server
+            delete payload.fullName;
+        }
+
+        // Dọn dẹp các field rác của UI trước khi gửi đi
+        delete payload.avatar;
+        delete payload.newPassword;
+        delete payload.confirmPassword;
+
+        mixinFuncs.handleSubmit(payload);
     };
+    
+    const format = (msg) => (translate?.formatMessage ? translate.formatMessage(msg) : '');
 
     return (
         <Card className="card-form" bordered={false} style={{ minHeight: 'calc(100vh - 190px)' }}>
@@ -75,15 +91,16 @@ const ProfileForm = (props) => {
                 layout="horizontal"
                 onValuesChange={onValuesChange}
             >
-                <TextField readOnly label={translate.formatMessage(messages.username)} name={'username'} />
+                <TextField required readOnly label={format(messages.username)} name="username" />
 
-                <TextField label={translate.formatMessage(messages.email)} name={'email'} />
+                <TextField required label={format(messages.email)} name="email" />
 
-                <TextField label={translate.formatMessage(messages.fullName)} name={'fullName'} />
+                <TextField required label={format(messages.fullName)} name="fullName" />
 
                 <TextField 
-                    label={translate.formatMessage(messages.phoneNumber)} 
-                    name={'phone'}
+                    required
+                    label={format(messages.phoneNumber)} 
+                    name="phone"
                 />
 
                 <DatePickerField
@@ -93,28 +110,31 @@ const ProfileForm = (props) => {
                     showTime={false}
                 />
 
-                <TextField
-                    type="password"
-                    required
-                    label={translate.formatMessage(messages.currentPassword)}
-                    name="oldPassword"
-                />
+                {isAdmin && (
+                    <>
+                        <TextField
+                            type="password"
+                            required
+                            label={format(messages.currentPassword)}
+                            name="oldPassword"
+                        />
 
+                        <TextField
+                            type="password"
+                            label={format(messages.newPassword)}
+                            name="newPassword"
+                            rules={passwordRules}  
+                        />
 
-                <TextField
-                    type="password"
-                    label={translate.formatMessage(messages.newPassword)}
-                    name="newPassword"
-                    rules={passwordRules}  
-                />
-
-                <TextField
-                    type="password"
-                    label={translate.formatMessage(messages.confirmPassword)}
-                    name="confirmPassword"
-                    dependencies={['newPassword']}
-                    rules={confirmPasswordRules(form.getFieldValue)}  
-                />
+                        <TextField
+                            type="password"
+                            label={format(messages.confirmPassword)}
+                            name="confirmPassword"
+                            dependencies={['newPassword']}
+                            rules={confirmPasswordRules(form.getFieldValue)}  
+                        />
+                    </>
+                )}
 
                 <div className="footer-card-form">{actions}</div>
             </Form>

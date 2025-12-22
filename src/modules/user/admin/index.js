@@ -9,6 +9,7 @@ import AvatarField from '@components/common/form/AvatarField';
 import BaseTable from '@components/common/table/BaseTable';
 import ListPage from '@components/common/layout/ListPage';
 import PageWrapper from '@components/common/layout/PageWrapper';
+import { educatorStatusOptions } from '@constants/masterData';
 
 import { UserOutlined } from '@ant-design/icons';
 import { Empty, Tag } from 'antd';
@@ -17,6 +18,11 @@ import { FieldTypes } from '@constants/formConfig';
 
 const AdminListPage = ({ pageOptions }) => {
     const translate = useTranslate();
+
+    const formattedStatusOptions = translate.formatKeys(educatorStatusOptions, ['label']);
+    const statusMap = Object.fromEntries(
+        formattedStatusOptions.map(item => [item.value, item]),
+    );
 
     const apiConfiguration = {
         getList: apiConfig.account.adminList,
@@ -34,13 +40,6 @@ const AdminListPage = ({ pageOptions }) => {
                 ?.toLowerCase(),
         },
         override: (funcs) => {
-            const statusMap = {
-                1: { label: translate.formatMessage(commonMessage.statusActive), color: '#00A648' },
-                2: { label: translate.formatMessage(commonMessage.statusPending), color: '#FFBF00' },
-                3: { label: translate.formatMessage(commonMessage.statusLock), color: '#CC0000' },
-            };
-
-            // ⚠️ Lưu lại hàm gốc tránh đệ quy vô hạn
             const originalActionColumnButtons = funcs.actionColumnButtons;
 
             // ✅ Ghi đè hàm renderStatusColumn

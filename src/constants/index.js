@@ -1,6 +1,7 @@
 import { commonMessage } from '@locales/intl';
 
 export const apiUrl = process.env.REACT_APP_API;
+export const apiMediaUrl = process.env.REACT_APP_API_MEDIA;
 export const enableExposure = process.env.REACT_APP_ENABLE_EXPOSURE === 'true';
 export const apiTenantUrl = 'http://api-path/';
 
@@ -181,13 +182,6 @@ export const DURATION_TYPE_HOUR = 'h';
 export const DURATION_TYPE_MINUTE = 'm';
 export const DURATION_TYPE_SECOND = 's';
 
-export const PHONE_CALL_TYPE_OUTGOING = 1;
-export const PHONE_CALL_TYPE_COMING = 2;
-export const PHONE_CALL_TYPE_MISSING = 3;
-export const PHONE_CALL_TYPE_TAKLING = 4;
-export const PHONE_CALL_TYPE_DONE = 5;
-export const PHONE_CALL_TYPE_CANCELED = 6;
-
 export const PLATFORM_ANDROID = 1;
 export const PLATFORM_IOS = 2;
 
@@ -212,9 +206,6 @@ export const BREAKPOINTS = {
 
 export const GRANT_TYPE_ADMIN = 'password';
 export const GRANT_TYPE_EMPLOYEE = 'employee';
-
-export const DEVICE_EMPLOYEE_LOG_TRANSFER = 1;
-export const DEVICE_EMPLOYEE_LOG_RETURN = 2;
 
 export const TAG_KIND_PHONE_CALL_MESSAGE = 1;
 export const TAG_KIND_CONTACT = 2;

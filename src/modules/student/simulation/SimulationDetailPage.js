@@ -373,7 +373,7 @@ const SimulationDetailPage = ({ pageOptions }) => {
                         {/* Specialization */}
                         {simulation.specialization && (
                             <Card className="specialization-card" style={{ marginTop: 16 }}>
-                                <Title level={5}>Chuyên môn</Title>
+                                <Title level={5}>Chuyên ngành</Title>
                                 <Tag color="blue" style={{ fontSize: 14, padding: '6px 16px' }}>
                                     {simulation.specialization.name}
                                 </Tag>

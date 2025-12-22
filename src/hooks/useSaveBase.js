@@ -55,10 +55,10 @@ const useSaveBase = ({
     const { execute: executeCreate, loading: loadingCreate } = useFetch(apiConfig.create, { immediate: false });
     const { execute: executeUpdate, loading: loadingUpdate } = useFetch(apiConfig.update, { immediate: false });
     const intl = useIntl();
-    const title = intl.formatMessage(message.title, {
-        action: isEditing,
+    const title = intl?.formatMessage ? intl.formatMessage(message.title, {
+        action: params.id !== 'create',
         objectName: options.objectName,
-    });
+    }) : '';
     const notification = useNotification();
     // const [ filter, setFilter ] = useState({});
 
@@ -185,16 +185,42 @@ const useSaveBase = ({
         }
     };
 
-    const handleShowErrorMessage = (err, showErrorMessage) => {
+    const handleShowErrorMessage = (err) => {
         const { response } = err;
-        if (err && (response?.data?.message || err.message)) showErrorMessage(response?.data?.message || err.message);
-        else showErrorMessage(`${getActionName()} failed. Please try again!`, translate);
+        const responseData = response?.data;
+
+        // Kiểm tra nếu có mảng errors trong responseData.data
+        if (responseData?.data && Array.isArray(responseData.data) && responseData.data.length > 0) {
+            responseData.data.forEach((item) => {
+                if (item.message) {
+                    showErrorMessage(item.message, translate);
+                }
+            });
+            return; 
+        }
+
+        // Kiểm tra nếu có message trong responseData
+        if (responseData?.message) {
+            showErrorMessage(responseData.message, translate);
+            return;
+        }
+
+        // Kiểm tra nếu có message trong err
+        if (err && err.message) {
+            showErrorMessage(err.message, translate);
+        } else {
+            // Fallback message
+            showErrorMessage(`${getActionName()} failed. Please try again!`, translate);
+        }
     };
 
-    const onSaveError = (err, handleError) => {
-        mixinFuncs.handleShowErrorMessage(err, showErrorMessage);
+    const onSaveError = (err, callback) => {
         setSubmit(false);
-        handleError(err);
+        mixinFuncs.handleShowErrorMessage(err);
+        
+        if (typeof callback === 'function') {
+            callback(err);
+        }
     };
 
     const setIsChangedFormValues = (flag) => {
@@ -299,8 +325,8 @@ const useSaveBase = ({
     return {
         detail,
         mixinFuncs,
-        loading,
-        onSave,
+        loading: false,
+        onSave: mixinFuncs.onSave,
         setIsChangedFormValues,
         isEditing,
         title,

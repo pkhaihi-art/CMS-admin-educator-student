@@ -204,6 +204,13 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
             return [];
         }
     };
+
+    // Tìm đáp án đúng trong options (cho questionType = 3)
+    const getCorrectOption = (options) => {
+        if (!Array.isArray(options)) return null;
+        const correctOpt = options.find(opt => opt.answer === true);
+        return correctOpt ? correctOpt.option : null;
+    };
     
     // Hàm lấy label đã dịch cho questionType
     const getQuestionTypeLabel = (questionType) => {
@@ -318,9 +325,9 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
                             <span>Câu {qIdx + 1}</span>
                             {studentAnswer ? (
                                 studentAnswer.isCorrect ? (
-                                    <Tag color="green" icon={<CheckCircleOutlined />}>Đúng</Tag>
+                                    <Tag color="green" icon={<CheckCircleOutlined />}>Đã nộp</Tag>
                                 ) : (
-                                    <Tag color="red" icon={<CloseCircleOutlined />}>Sai</Tag>
+                                    <Tag color="red" icon={<CloseCircleOutlined />}>Chưa nộp</Tag>
                                 )
                             ) : (
                                 <Tag color="default">Chưa trả lời</Tag>
@@ -432,7 +439,7 @@ const StudentReviewDetailPage = ({ pageOptions }) => {
                                             </span>
                                             {taskStats.totalCount > 0 && (
                                                 <Tag color={taskStats.percentage >= 70 ? 'green' : taskStats.percentage >= 50 ? 'orange' : 'red'}>
-                                                    Đúng: {taskStats.correctCount}/{taskStats.totalCount} ({taskStats.percentage}%)
+                                                    Đã nộp: {taskStats.correctCount}/{taskStats.totalCount} ({taskStats.percentage}%)
                                                 </Tag>
                                             )}
                                         </div>

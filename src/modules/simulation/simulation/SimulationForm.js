@@ -13,7 +13,10 @@ import useTranslate from '@hooks/useTranslate';
 import { AppConstants } from '@constants';
 import apiConfig from '@constants/apiConfig';
 import { commonMessage } from '@locales/intl';
-import FileUploadField from '@components/common/form/FileUploadField';
+import { UserTypes } from '@constants';
+import { getData } from '@utils/localStorage';
+import { storageKeys } from '@constants';
+import SimulationPreview from '@components/simulation/SimulationPreview.js';
 
 const SimulationForm = (props) => {
     const {
@@ -27,9 +30,12 @@ const SimulationForm = (props) => {
         isEditing,
     } = props;
 
+    const userType = getData(storageKeys.USER_TYPE);
+    const canEdit = userType === UserTypes.EDUCATOR;
+
     const translate = useTranslate();
     const [imagePath, setImagePath] = useState(null);
-    const [videoPath, setVideoPath] = useState(null);
+    const [videoUrl, setVideoUrl] = useState('');
     const [previewVisible, setPreviewVisible] = useState(false);
 
     // Description fields
@@ -68,13 +74,10 @@ const SimulationForm = (props) => {
             onCompleted: (response) => {
                 if (response.result === true) {
                     onSuccess();
-                    if (type === 'SIMULATION_IMAGE') {
+                    if (type === 'IMAGE') {
                         setImagePath(response.data.filePath);
                         form.setFieldsValue({ imagePath: response.data.filePath });
-                    } else if (type === 'SIMULATION_VIDEO') {
-                        setVideoPath(response.data.filePath);
-                        form.setFieldsValue({ videoPath: response.data.filePath });
-                    }
+                    } 
                     setIsChangedFormValues(true);
                 }
             },
@@ -94,14 +97,11 @@ const SimulationForm = (props) => {
         }
     };
 
-    // Parse JSON to extract title and content
     const parseJsonData = (jsonData) => {
         if (!jsonData) return { title: '', content: '' };
         
-        // If already HTML, try to extract
         if (!isJsonString(jsonData)) {
             if (typeof jsonData === 'string' && jsonData.includes('<')) {
-                // Try to extract h2 and remaining content
                 const h2Match = jsonData.match(/<h2>(.*?)<\/h2>/);
                 const title = h2Match ? h2Match[1] : '';
                 const content = jsonData.replace(/<h2>.*?<\/h2>/, '').trim();
@@ -113,7 +113,6 @@ const SimulationForm = (props) => {
         try {
             const parsed = JSON.parse(jsonData);
             
-            // Format: {title: "...", content: "..."}
             if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
                 return {
                     title: parsed.title || '',
@@ -121,16 +120,13 @@ const SimulationForm = (props) => {
                 };
             }
             
-            // Format: [{title: "...", content: "..."}, ...]
             if (Array.isArray(parsed) && parsed.length > 0) {
-                // Take first item as main, or combine all
                 if (parsed.length === 1) {
                     return {
                         title: parsed[0].title || '',
                         content: parsed[0].content || '',
                     };
                 } else {
-                    // Combine multiple sections into HTML
                     let html = '';
                     parsed.forEach((section, index) => {
                         if (section.title && index > 0) {
@@ -158,16 +154,13 @@ const SimulationForm = (props) => {
         }
     };
 
-    // Convert plain text content to HTML for Quill
     const convertContentToHtml = (content) => {
         if (!content) return '';
         
-        // If already HTML
         if (content.includes('<')) {
             return content;
         }
         
-        // Convert plain text with bullets to HTML
         const lines = content.split('\n').filter(line => line.trim());
         let html = '';
         let inList = false;
@@ -197,16 +190,10 @@ const SimulationForm = (props) => {
         return html || '<p><br></p>';
     };
 
-    // Clean up Quill HTML - remove empty tags but keep the HTML structure
     const cleanQuillHtml = (html) => {
         if (!html || html === '<p><br></p>') return '';
-        
-        // Remove empty paragraphs at the end
         let cleaned = html.trim();
-        
-        // Remove trailing <p><br></p> or <p></p>
         cleaned = cleaned.replace(/(<p><br><\/p>|<p><\/p>)+$/g, '');
-        
         return cleaned;
     };
 
@@ -217,20 +204,16 @@ const SimulationForm = (props) => {
                 specializationId: dataDetail.specialization?.id,
             });
             setImagePath(dataDetail.imagePath);
-            setVideoPath(dataDetail.videoPath);
+            setVideoUrl(dataDetail.videoPath || '');
 
-            // Parse Description
             if (dataDetail.description) {
                 const descData = parseJsonData(dataDetail.description);
-                console.log('📝 Description parsed:', descData);
                 setDescriptionTitle(descData.title);
                 setDescriptionContent(convertContentToHtml(descData.content));
             }
 
-            // Parse Overview
             if (dataDetail.overview) {
                 const overviewData = parseJsonData(dataDetail.overview);
-                console.log('📋 Overview parsed:', overviewData);
                 setOverviewTitle(overviewData.title);
                 setOverviewContent(convertContentToHtml(overviewData.content));
             }
@@ -238,11 +221,9 @@ const SimulationForm = (props) => {
     }, [dataDetail]);
 
     const handleSubmit = (values) => {
-        // Keep HTML content - just clean it up
         const cleanedDescriptionContent = cleanQuillHtml(descriptionContent);
         const cleanedOverviewContent = cleanQuillHtml(overviewContent);
 
-        // Create JSON objects with HTML content
         const descriptionJson = JSON.stringify({
             title: descriptionTitle || '',
             content: cleanedDescriptionContent || '',
@@ -253,16 +234,10 @@ const SimulationForm = (props) => {
             content: cleanedOverviewContent || '',
         }]);
 
-        console.log('📤 Sending data:', {
-            ...values,
-            description: descriptionJson,
-            overview: overviewJson,
-        });
-
         mixinFuncs.handleSubmit({
             ...values,
             imagePath: imagePath || null,
-            videoPath: videoPath || null,
+            videoPath: videoUrl || null,
             description: descriptionJson,
             overview: overviewJson,
         });
@@ -273,7 +248,7 @@ const SimulationForm = (props) => {
         return {
             ...formValues,
             imagePath,
-            videoPath,
+            videoPath: videoUrl,
             descriptionTitle,
             descriptionContent,
             overviewTitle,
@@ -293,6 +268,7 @@ const SimulationForm = (props) => {
                                 label={translate.formatMessage(commonMessage.title)}
                                 name="title"
                                 required
+                                disabled={!canEdit}
                             />
                         </Col>
                         <Col span={12}>
@@ -303,6 +279,7 @@ const SimulationForm = (props) => {
                                 valuePropName="id"
                                 labelPropName="name"
                                 required
+                                disabled={!canEdit}
                             />
                         </Col>
                     </Row>
@@ -314,6 +291,7 @@ const SimulationForm = (props) => {
                                 name="level"
                                 options={levels}
                                 required
+                                disabled={!canEdit}
                             />
                         </Col>
                         <Col span={12}>
@@ -322,13 +300,13 @@ const SimulationForm = (props) => {
                                 name="totalEstimatedTime"
                                 placeholder="VD: 1 - 2 giờ"
                                 required
+                                disabled={!canEdit}
                             />
                         </Col>
                     </Row>
 
                     <Divider orientation="left">Mô tả khóa học</Divider>
 
-                    {/* Description Title */}
                     <Row gutter={16}>
                         <Col span={24}>
                             <div style={{ marginBottom: 16 }}>
@@ -343,12 +321,12 @@ const SimulationForm = (props) => {
                                     }}
                                     placeholder="VD: Tại sao phải hoàn thành Mô phỏng công việc này"
                                     size="large"
+                                    disabled={!canEdit}
                                 />
                             </div>
                         </Col>
                     </Row>
 
-                    {/* Description Content */}
                     <Row gutter={16}>
                         <Col span={24}>
                             <div style={{ marginBottom: 16 }}>
@@ -365,6 +343,7 @@ const SimulationForm = (props) => {
                                     modules={quillModules}
                                     formats={quillFormats}
                                     placeholder="Nhập nội dung mô tả chi tiết về khóa học..."
+                                    readOnly={!canEdit}
                                     style={{ 
                                         background: 'white',
                                         borderRadius: '4px',
@@ -380,7 +359,6 @@ const SimulationForm = (props) => {
 
                     <Divider orientation="left">Tổng quan khóa học</Divider>
 
-                    {/* Overview Title */}
                     <Row gutter={16}>
                         <Col span={24}>
                             <div style={{ marginBottom: 16 }}>
@@ -395,12 +373,12 @@ const SimulationForm = (props) => {
                                     }}
                                     placeholder="VD: Nó hoạt động như thế nào"
                                     size="large"
+                                    disabled={!canEdit}
                                 />
                             </div>
                         </Col>
                     </Row>
 
-                    {/* Overview Content */}
                     <Row gutter={16}>
                         <Col span={24}>
                             <div style={{ marginBottom: 16 }}>
@@ -417,6 +395,7 @@ const SimulationForm = (props) => {
                                     modules={quillModules}
                                     formats={quillFormats}
                                     placeholder="Nhập nội dung tổng quan về khóa học..."
+                                    readOnly={!canEdit}
                                     style={{ 
                                         background: 'white',
                                         borderRadius: '4px',
@@ -440,19 +419,32 @@ const SimulationForm = (props) => {
                                 imageUrl={imagePath && `${AppConstants.contentRootUrl}${imagePath}`}
                                 aspect={16 / 9}
                                 uploadFile={(file, onSuccess, onError) =>
-                                    uploadFile(file, onSuccess, onError, 'SIMULATION_IMAGE')
+                                    uploadFile(file, onSuccess, onError, 'IMAGE')
                                 }
+                                disabled={!canEdit}
                             />
                         </Col>
                         <Col span={12}>
-                            <FileUploadField
-                                label={translate.formatMessage(commonMessage.video)}
-                                name="videoPath"
-                                filePath={videoPath}
-                                uploadFile={(file, onSuccess, onError) =>
-                                    uploadFile(file, onSuccess, onError, 'SIMULATION_VIDEO')
-                                }
-                            />
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
+                                    Video URL 
+                                </label>
+                                <Input
+                                    value={videoUrl}
+                                    onChange={(e) => {
+                                        setVideoUrl(e.target.value);
+                                        setIsChangedFormValues(true);
+                                    }}
+                                    placeholder="Nhập URL hoặc mã embed video (YouTube, Vimeo, etc.)"
+                                    size="large"
+                                    disabled={!canEdit}
+                                />
+                                {videoUrl && (
+                                    <div style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
+                                        📹 Video: {videoUrl}
+                                    </div>
+                                )}
+                            </div>
                         </Col>
                     </Row>
 
@@ -461,130 +453,34 @@ const SimulationForm = (props) => {
                             <Button
                                 icon={<EyeOutlined />}
                                 onClick={() => setPreviewVisible(true)}
+                                type="default"
+                                size="large"
                             >
                                 Xem trước
                             </Button>
-                            {actions}
+                            {canEdit && actions}
                         </Space>
                     </div>
                 </Card>
             </BaseForm>
 
-            <SimulationPreviewModal
-                visible={previewVisible}
-                onClose={() => setPreviewVisible(false)}
-                data={getPreviewData()}
-            />
-        </>
-    );
-};
-
-const SimulationPreviewModal = ({ visible, onClose, data }) => {
-    return (
-        <Modal
-            title="Xem trước Simulation"
-            open={visible}
-            onCancel={onClose}
-            width={800}
-            footer={[
-                <Button key="close" type="primary" onClick={onClose}>
-                    Đóng
-                </Button>,
-            ]}
-        >
-            <div style={{ maxHeight: '70vh', overflowY: 'auto', padding: '16px' }}>
-                <div style={{ marginBottom: 24 }}>
-                    <h2 style={{ marginBottom: 8 }}>{data.title || 'Chưa có tiêu đề'}</h2>
-                    <Space wrap>
-                        {data.level && (
-                            <span style={{
-                                background: '#e6f7ff',
-                                padding: '4px 12px',
-                                borderRadius: '4px',
-                                color: '#1890ff',
-                            }}>
-                                Level {data.level.label || data.level}
-                            </span>
-                        )}
-                        {data.totalEstimatedTime && (
-                            <span style={{ color: '#666' }}>⏱ {data.totalEstimatedTime}</span>
-                        )}
-                        {data.specialization && (
-                            <span style={{ color: '#666' }}>📚 {data.specialization.label}</span>
-                        )}
-                    </Space>
-                </div>
-
-                {data.imagePath && (
-                    <img
-                        src={`${AppConstants.contentRootUrl}${data.imagePath}`}
-                        alt="Preview"
-                        style={{ width: '100%', borderRadius: '8px', marginBottom: 24 }}
-                    />
-                )}
-
-                {/* Description Preview */}
-                {(data.descriptionTitle || data.descriptionContent) && (
-                    <Card title="Mô tả khóa học" style={{ marginBottom: 16 }}>
-                        {data.descriptionTitle && (
-                            <h2 style={{ marginTop: 0, marginBottom: 16 }}>{data.descriptionTitle}</h2>
-                        )}
-                        {data.descriptionContent && data.descriptionContent !== '<p><br></p>' && (
-                            <div 
-                                className="ql-editor" 
-                                style={{ padding: 0 }}
-                                dangerouslySetInnerHTML={{ __html: data.descriptionContent }}
-                            />
-                        )}
-                    </Card>
-                )}
-
-                {/* Overview Preview */}
-                {(data.overviewTitle || data.overviewContent) && (
-                    <Card title="Tổng quan khóa học" style={{ marginBottom: 16 }}>
-                        {data.overviewTitle && (
-                            <h3 style={{ marginTop: 0, marginBottom: 16 }}>{data.overviewTitle}</h3>
-                        )}
-                        {data.overviewContent && data.overviewContent !== '<p><br></p>' && (
-                            <div 
-                                className="ql-editor" 
-                                style={{ padding: 0 }}
-                                dangerouslySetInnerHTML={{ __html: data.overviewContent }}
-                            />
-                        )}
-                    </Card>
-                )}
-
-                <Divider orientation="left" style={{ fontSize: 12, color: '#999' }}>
-                    JSON Output (Debug)
-                </Divider>
-                <pre style={{ 
-                    background: '#f5f5f5', 
-                    padding: 12, 
-                    borderRadius: 4, 
-                    fontSize: 11,
+            {/* Preview Modal with Full-Screen Content */}
+            <Modal
+                title="Xem trước Simulation"
+                open={previewVisible}
+                onCancel={() => setPreviewVisible(false)}
+                width="100%"
+                style={{ top: 0, paddingBottom: 0 }}
+                bodyStyle={{ 
+                    height: 'calc(100vh - 110px)',
+                    padding: 0,
                     overflow: 'auto',
-                    maxHeight: 200,
-                }}>
-                    {JSON.stringify({
-                        title: data.title,
-                        specializationId: data.specialization?.value,
-                        level: typeof data.level === 'object' ? data.level.value : data.level,
-                        totalEstimatedTime: data.totalEstimatedTime,
-                        description: JSON.stringify({
-                            title: data.descriptionTitle || '',
-                            content: data.descriptionContent || '',
-                        }),
-                        overview: JSON.stringify([{
-                            title: data.overviewTitle || '',
-                            content: data.overviewContent || '',
-                        }]),
-                        imagePath: data.imagePath || null,
-                        videoPath: data.videoPath || null,
-                    }, null, 2)}
-                </pre>
-            </div>
-        </Modal>
+                }}
+                footer={null}
+            >
+                <SimulationPreview data={getPreviewData()} />
+            </Modal>
+        </>
     );
 };
 

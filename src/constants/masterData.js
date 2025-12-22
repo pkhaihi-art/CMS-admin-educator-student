@@ -24,16 +24,11 @@ import {
     MESSAGE_STATUS_READ,
     MESSAGE_STATUS_UNREAD,
     STATUS_LOCK,
-    PHONE_CALL_TYPE_DONE,
-    PHONE_CALL_TYPE_CANCELED,
-    PHONE_CALL_TYPE_TAKLING,
-    DEVICE_EMPLOYEE_LOG_TRANSFER,
-    DEVICE_EMPLOYEE_LOG_RETURN,
     STATE_WAITING_OTP,
     TaskTypes,
 } from '@constants';
 import { defineMessages } from 'react-intl';
-import { nationKindMessage, actionMessage } from './intl';
+import { actionMessage } from './intl';
 import { commonMessage } from '@locales/intl';
 
 
@@ -41,12 +36,6 @@ export const languageOptions = [
     { value: 1, label: 'EN' },
     { value: 2, label: 'VN' },
     { value: 3, label: 'Other' },
-];
-
-export const orderOptions = [
-    { value: 1, label: '1' },
-    { value: 2, label: '2' },
-    { value: 3, label: '3' },
 ];
 
 export const commonStatus = [
@@ -62,28 +51,27 @@ export const statusOptions = [
 ];
 
 export const educatorStatusOptions = [
-    { value: STATUS_ACTIVE, label: commonMessage.statusActive, color: '#00A648' },
-    { value: STATUS_PENDING, label: commonMessage.statusPending, color: '#FFBF00' },
-    { value: STATUS_LOCK, label: commonMessage.statusLock, color: '#CC0000' },
-    { value: STATE_WAITING_OTP, label: commonMessage.statusWaitingOtp, color: '#007accff' },
+    { value: 1, label: commonMessage.statusActive, color: '#00A648' },
+    { value: 2, label: commonMessage.statusWaitingApproveSinup, color: '#FFBF00' },
+    { value: 0, label: commonMessage.statusWaitingOtp, color: '#007accff' },
+    { value: -2, label: commonMessage.statusReject, color: '#CC0000' },
+];
+
+export const studentStatusOptions = [
+    { value: 1, label: commonMessage.statusActive, color: '#00A648' },
+    { value: 0, label: commonMessage.statusWaitingOtp, color: '#007accff' },
 ];
 
 export const levelOptions = [
-    { value: STATUS_ACTIVE, label: commonMessage.level_1, color: '#00A648' },
-    { value: STATUS_PENDING, label: commonMessage.level_2, color: '#FFBF00' },
-    { value: STATUS_INACTIVE, label: commonMessage.level_3, color: '#CC0000' },
+    { value: 1, label: commonMessage.level_1, color: '#00A648' },
+    { value: 2, label: commonMessage.level_2, color: '#FFBF00' },
+    { value: 3, label: commonMessage.level_3, color: '#CC0000' },
 ];
 
-
-
-// Simulation status options
 export const simulationStatusOptions = [
     { value: STATUS_ACTIVE, label: commonMessage.statusActive, color: '#00A648' },
-    { value: STATUS_PENDING, label: commonMessage.statusPending, color: '#FFBF00' },
     { value: STATUS_WAITING_APPROVE, label: commonMessage.statusWaitingApprove, color: '#1890ff' },
     { value: STATUS_WAITING_APPROVE_DELETE, label: commonMessage.statusWaitingApproveDelete, color: '#fa8c16' },
-    { value: STATUS_LOCK, label: commonMessage.statusLock, color: '#CC0000' },
-    { value: STATUS_REJECT, label: commonMessage.statusReject, color: '#8c8c8c' },
 ];
 
 export const formSize = {
@@ -93,34 +81,6 @@ export const formSize = {
     large: '1200px',
     extraLarge: '1500px',
 };
-
-export const nationKindOptions = [
-    {
-        value: PROVINCE_KIND,
-        label: nationKindMessage.province,
-    },
-    {
-        value: DISTRICT_KIND,
-        label: nationKindMessage.district,
-    },
-    {
-        value: VILLAGE_KIND,
-        label: nationKindMessage.village,
-    },
-];
-
-export const kindPost = [
-    {
-        value: 1,
-        label: 'Post',
-        color: 'green',
-    },
-    {
-        value: 2,
-        label: 'Story',
-        color: 'blue',
-    },
-];
 
 export const settingGroups = {
     GENERAL: 'general',
@@ -157,76 +117,9 @@ export const genderOptions = [
     { value: GENDER_OTHER, label: commonMessage.genderOther, color: '#FFBF00' },
 ];
 
-export const durationTypeOptions = [
-    { value: DURATION_TYPE_HOUR, label: commonMessage.durationTypeHour },
-    { value: DURATION_TYPE_MINUTE, label: commonMessage.durationTypeMinute },
-    { value: DURATION_TYPE_SECOND, label: commonMessage.durationTypeSecond },
-];
-
-export const phoneCallTypeOptions = [
-    { value: PHONE_CALL_TYPE_OUTGOING, label: commonMessage.phoneCallTypeOutGoing },
-    { value: PHONE_CALL_TYPE_COMING, label: commonMessage.phoneCallTypeComing },
-    { value: PHONE_CALL_TYPE_MISSING, label: commonMessage.phoneCallTypeMissing },
-    { value: PHONE_CALL_TYPE_TAKLING, label: commonMessage.phoneCallTypeTalking },
-    { value: PHONE_CALL_TYPE_DONE, label: commonMessage.phoneCallTypeDone },
-    { value: PHONE_CALL_TYPE_CANCELED, label: commonMessage.phoneCallTypeCanceled },
-];
-export const DEVICE_PLATFORMS = [
-    { label: 'Android', value: PLATFORM_ANDROID },
-    { label: 'iOS', value: PLATFORM_IOS },
-];
-
-export const messageTypeOptions = [
-    { value: MESSAGE_TYPE_SEND, label: commonMessage.messageTypeSend },
-    { value: MESSAGE_TYPE_RECEIVE, label: commonMessage.messageTypeReceive },
-];
-
-export const messageStatusOptions = [
-    { value: MESSAGE_STATUS_READ, label: commonMessage.messageStatusRead },
-    { value: MESSAGE_STATUS_UNREAD, label: commonMessage.messageStatusUnread },
-];
-
-export const deviceEmployeeLogOptions = [
-    { value: DEVICE_EMPLOYEE_LOG_TRANSFER, label: commonMessage.deviceEmployeeLogTransfer },
-    { value: DEVICE_EMPLOYEE_LOG_RETURN, label: commonMessage.deviceEmployeeLogReturn },
-];
-
-// export const statusOptions = [
-//     {
-//         value: 1,
-//         label: 'Active',
-//         color: '#00A648',
-//     },
-//     {
-//         value: 0,
-//         label: 'Inactive',
-//         color: '#CC0000',
-//     },
-// ];
-
-// // Educator status options (đã có sẵn)
-// export const educatorStatusOptions = [
-//     {
-//         value: 1,
-//         label: 'Active',
-//         color: '#00A648',
-//     },
-//     {
-//         value: 2,
-//         label: 'Pending',
-//         color: '#FFBF00',
-//     },
-//     {
-//         value: 3,
-//         label: 'Lock',
-//         color: '#CC0000',
-//     },
-// ];
-
-// Task Kind Options
 export const taskKindOptions = [
-    { value: TaskTypes.TASK, label: { id: 'task', defaultMessage: 'task' }, color: '#00A648' },
-    { value: TaskTypes.SUBTASK, label: { id: 'subtask', defaultMessage: 'subtask' }, color: '#FFBF00' },
+    { value: TaskTypes.TASK, label: { id: 'task', defaultMessage: 'Task' }, color: '#00A648' },
+    { value: TaskTypes.SUBTASK, label: { id: 'subtask', defaultMessage: 'SubTask' }, color: '#FFBF00' },
 ];
 
 export const questionTypeOptions = [
@@ -245,31 +138,4 @@ export const questionTypeOptions = [
         label: { id: 'question.type.choice', defaultMessage: 'Multiple Choice' },
         color: 'orange',
     },
-];
-
-
-
-// Simulation Status Options
-// export const simulationStatusOptions = [
-//     { value: 1, label: 'statusActive', color: '#00A648' },
-//     { value: 2, label: 'statusPending', color: '#FFBF00' },
-//     { value: 3, label: 'statusLock', color: '#CC0000' },
-//     { value: 4, label: 'statusDraft', color: '#808080' },
-//     { value: 5, label: 'statusRequestDelete', color: '#FF6B6B' },
-// ];
-//
-// Level Options
-// export const levelOptions = [
-//     { value: 1, label: 'levelBeginner', color: 'green' },
-//     { value: 2, label: 'levelIntermediate', color: 'blue' },
-//     { value: 3, label: 'levelAdvanced', color: 'orange' },
-//     { value: 4, label: 'levelExpert', color: 'red' },
-// ];
-
-// Subtask Progress Status
-export const subtaskProgressStatusOptions = [
-    { value: 1, label: 'progressNotStarted', color: 'default' },
-    { value: 2, label: 'progressInProgress', color: 'processing' },
-    { value: 3, label: 'progressCompleted', color: 'success' },
-    { value: 4, label: 'progressFailed', color: 'error' },
 ];

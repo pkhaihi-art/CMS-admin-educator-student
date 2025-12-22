@@ -1,4 +1,4 @@
-import { apiUrl, apiTenantUrl } from '.';
+import { apiUrl, apiTenantUrl, apiMediaUrl } from '.';
 import { UserTypes } from '@constants';
 import { getData } from '@utils/localStorage';
 import { storageKeys } from '@constants';
@@ -60,16 +60,33 @@ const apiConfig = {
                 headers: baseHeader,
             };
         },
-        profile: {
-            baseURL: `${apiUrl}v1/account/profile`,
-            method: 'GET',
-            headers: baseHeader,
-        },
-        updateProfile: {
-            baseURL: `${apiUrl}v1/account/update_profile_admin`,
-            method: 'PUT',
-            headers: baseHeader,
-            permissionCode: 'ACC_AD_U',
+        get updateProfile() {
+            const userType = getData(storageKeys.USER_TYPE);
+            
+            if (userType === UserTypes.EDUCATOR) {
+                return {
+                    baseURL: `${apiUrl}v1/educator/client_update`,
+                    method: `PUT`,
+                    headers: baseHeader,
+                    permissionCode: 'ED_U_U',
+                };
+            }
+            
+            if (userType === UserTypes.STUDENT) {
+                return {
+                    baseURL: `${apiUrl}v1/student/update`,
+                    method: `PUT`,
+                    headers: baseHeader,
+                    permissionCode: 'ST_U',
+                };
+            }
+            
+            return {
+                baseURL: `${apiUrl}v1/account/update_profile_admin`,
+                method: 'PUT',
+                headers: baseHeader,
+                permissionCode: 'ACC_AD_U',
+            };
         },
         forgetPassword: {
             baseURL: `${apiUrl}v1/account/forget_password`,
@@ -551,7 +568,7 @@ const apiConfig = {
         },
     },
     educator: {
-        changeStatus: {
+        approve: {
             baseURL: `${apiUrl}v1/educator/approve`,
             method: `PUT`,
             headers: baseHeader,
@@ -655,7 +672,7 @@ const apiConfig = {
     },
     file: {
         upload: {
-            path: `${apiUrl}v1/file/upload`,
+            path: `${apiMediaUrl}v1/file/upload`,
             method: 'POST',
             headers: multipartFormHeader,
             isRequiredTenantId: true,

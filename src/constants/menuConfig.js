@@ -82,22 +82,22 @@ export const navMenuConfig = [
         ],
     },
     {
-        label: <FormattedMessage defaultMessage="Quản lý chuyên môn" />,
+        label: <FormattedMessage defaultMessage="Quản lý chuyên ngành" />,
         key: 'quan-ly-chuyen-mon',
         icon: <IconSettings size={16} />,
         children: [
             {
-                label: <FormattedMessage defaultMessage="Danh sách chuyên môn" />,
+                label: <FormattedMessage defaultMessage="Danh sách chuyên ngành" />,
                 key: 'specialization',
                 path: routes.specializationListPage.path,
                 permission: [apiConfig.specialization.getList.permissionCode],
             },
-            {
-                label: <FormattedMessage defaultMessage="Test" />,
-                key: 'test',
-                path: routes.testPage.path,
-                permission: [apiConfig.specialization.getList.permissionCode],
-            },
+            // {
+            //     label: <FormattedMessage defaultMessage="Test" />,
+            //     key: 'test',
+            //     path: routes.testPage.path,
+            //     permission: [apiConfig.specialization.getList.permissionCode],
+            // },
         ],
     },
     {

@@ -298,8 +298,7 @@ const RegisterPage = () => {
                                         <Input 
                                             size="large"
                                             placeholder="Nhập mã 6 chữ số" 
-                                            maxLength={6}
-                                            className={styles.otpInput}
+                                            maxLength={6}                                            
                                         />
                                     </Form.Item>
 

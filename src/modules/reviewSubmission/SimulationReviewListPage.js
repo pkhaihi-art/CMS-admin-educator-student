@@ -11,6 +11,7 @@ import { AppConstants, DEFAULT_TABLE_ITEM_SIZE } from '@constants';
 import apiConfig from '@constants/apiConfig';
 import { FieldTypes } from '@constants/formConfig';
 import { commonMessage } from '@locales/intl';
+import { simulationStatusOptions, levelOptions } from '@constants/masterData';
 
 import BaseTable from '@components/common/table/BaseTable';
 import ListPage from '@components/common/layout/ListPage';
@@ -25,9 +26,9 @@ const SimulationReviewListPage = ({ pageOptions }) => {
     const [showStudentModal, setShowStudentModal] = React.useState(false);
 
     const labels = {
-        title: 'Tiêu đề Simulation',
-        educator: 'Giáo viên',
-        specialization: 'Chuyên môn',
+        title: 'Tên bài mô phỏng',
+        educator: 'Khoa chuyên môn',
+        specialization: 'Chuyên ngành',
         level: 'Cấp độ',
         participantQuantity: 'Số học viên',
         avgRating: 'Đánh giá TB',
@@ -37,17 +38,23 @@ const SimulationReviewListPage = ({ pageOptions }) => {
         studentList: 'Danh sách học viên đã hoàn thành',
     };
 
-    const levelMap = {
-        1: { label: 'Cơ bản', color: 'blue' },
-        2: { label: 'Trung bình', color: 'orange' },
-        3: { label: 'Nâng cao', color: 'red' },
-    };
 
-    const statusMap = {
-        1: { label: 'Hoạt động', color: 'green' },
-        2: { label: 'Nháp', color: 'default' },
-        3: { label: 'Khóa', color: 'red' },
-    };
+    // const formattedStatusOptions = translate.formatKeys(simulationStatusOptions, ['label']);
+    const formattedLevelOptions = translate.formatKeys(levelOptions, ['label']);
+    
+    // const statusMap = Object.fromEntries(formattedStatusOptions.map(item => [item.value, item]));
+    const levelMap = Object.fromEntries(formattedLevelOptions.map(item => [item.value, item]));
+    // const levelMap = {
+    //     1: { label: 'Cơ bản', color: 'blue' },
+    //     2: { label: 'Trung bình', color: 'orange' },
+    //     3: { label: 'Nâng cao', color: 'red' },
+    // };
+
+    // const statusMap = {
+    //     1: { label: 'Hoạt động', color: 'green' },
+    //     2: { label: 'Nháp', color: 'default' },
+    //     3: { label: 'Khóa', color: 'red' },
+    // };
 
     const { data, mixinFuncs, queryFilter, loading, pagination } = useListBase({
         apiConfig: {
@@ -88,7 +95,7 @@ const SimulationReviewListPage = ({ pageOptions }) => {
         {
             title: labels.title,
             dataIndex: 'title',
-            width: getColumnWidth({ data, dataIndex: 'title', ratio: 15 }),
+            width: getColumnWidth({ data, dataIndex: 'title', ratio: 8 }),
         },
         // {
         //     title: labels.educator,
@@ -123,16 +130,16 @@ const SimulationReviewListPage = ({ pageOptions }) => {
             width: '100px',
             render: (rating) => rating ? rating.toFixed(1) : '0.0',
         },
-        {
-            title: labels.status,
-            dataIndex: 'status',
-            align: 'center',
-            width: '120px',
-            render: (status) => {
-                const item = statusMap[status] || {};
-                return <Tag color={item.color}>{item.label}</Tag>;
-            },
-        },
+        // {
+        //     title: labels.status,
+        //     dataIndex: 'status',
+        //     align: 'center',
+        //     width: '120px',
+        //     render: (status) => {
+        //         const item = statusMap[status] || {};
+        //         return <Tag color={item.color}>{item.label}</Tag>;
+        //     },
+        // },
         {
             title: labels.review,
             align: 'center',

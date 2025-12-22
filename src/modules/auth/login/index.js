@@ -108,7 +108,7 @@ const LoginPage = () => {
                 data: educatorPayload,
                 onCompleted: handleLoginSuccess,
                 onError: () => {
-                    antMessage.error('Đăng nhập thất bại!');
+                    antMessage.error('Đăng nhập thất bại! Thông tin không đúng hoặc Quản trị viên chưa kích hoạt tài khoản.');
                 },
             });
         } else if (userType === UserTypes.STUDENT) {

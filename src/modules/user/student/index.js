@@ -14,7 +14,7 @@ import {
 } from '@constants';
 import apiConfig from '@constants/apiConfig';
 import { FieldTypes } from '@constants/formConfig';
-import { educatorStatusOptions, genderOptions } from '@constants/masterData';
+import { studentStatusOptions, genderOptions } from '@constants/masterData';
 import { commonMessage } from '@locales/intl';
 
 import AvatarField from '@components/common/form/AvatarField';
@@ -28,7 +28,7 @@ const StudentListPage = ({ pageOptions }) => {
     const translate = useTranslate();
     const navigate = useNavigate();
 
-    const formattedStatusOptions = translate.formatKeys(educatorStatusOptions, ['label']);
+    const formattedStatusOptions = translate.formatKeys(studentStatusOptions, ['label']);
     const statusMap = Object.fromEntries(
         formattedStatusOptions.map(item => [item.value, item]),
     );
@@ -61,11 +61,6 @@ const StudentListPage = ({ pageOptions }) => {
             pageSize:   DEFAULT_TABLE_ITEM_SIZE,
         },
         override: (funcs) => {
-            const statusMap = {
-                1: { label: translate.formatMessage(commonMessage.statusActive), color: '#00A648' },
-                2: { label: translate.formatMessage(commonMessage.statusPending), color: '#FFBF00' },
-                3: { label: translate.formatMessage(commonMessage.statusLock), color: '#CC0000' },
-            };
 
             funcs.renderStatusColumn = (columnsProps) => ({
                 title: translate.formatMessage(commonMessage.status),
@@ -120,12 +115,12 @@ const StudentListPage = ({ pageOptions }) => {
             dataIndex: ['account', 'phone'],
             width: labels.phone.length * 10,
         },
-        {
-            title: labels.birthday,
-            dataIndex: 'birthday',
-            render: (value) => value ? dayjs(value).format('DD/MM/YYYY') : '',
-            width: 120,
-        },
+        // {
+        //     title: labels.birthday,
+        //     dataIndex: 'birthday',
+        //     render: (value) => value ? dayjs(value).format('DD/MM/YYYY') : '',
+        //     width: 120,
+        // },
         mixinFuncs.renderStatusColumn({ width: '120px' }),
 
         mixinFuncs.renderActionColumn(

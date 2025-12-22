@@ -42,6 +42,8 @@ const EducatorSimulationSavePage = ({ pageOptions }) => {
         }
         : {
             getById: apiConfig.simulation.getById,
+            create: apiConfig.simulation.create,
+            update: apiConfig.simulation.update,
         };
 
     const { detail, mixinFuncs, loading, onSave, setIsChangedFormValues, isEditing, title } = useSaveBase({

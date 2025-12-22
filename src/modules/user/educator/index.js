@@ -1,22 +1,20 @@
 import React from 'react';
 import { Empty, Tag, Button, Modal } from 'antd';
-import { UserOutlined, CheckOutlined } from '@ant-design/icons';
+import { UserOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
 
 import useListBase from '@hooks/useListBase';
+import useFetch from '@hooks/useFetch';
 import useTranslate from '@hooks/useTranslate';
+import useNotification from '@hooks/useNotification';
 
 import {
     AppConstants,
-    commonStatus,
     DEFAULT_TABLE_ITEM_SIZE,
-    STATUS_LOCK,
-    STATUS_PENDING,
 } from '@constants';
 import apiConfig from '@constants/apiConfig';
 import { FieldTypes } from '@constants/formConfig';
-import { educatorStatusOptions, genderOptions } from '@constants/masterData';
+import { educatorStatusOptions } from '@constants/masterData';
 import { commonMessage } from '@locales/intl';
 
 import AvatarField from '@components/common/form/AvatarField';
@@ -26,9 +24,15 @@ import PageWrapper from '@components/common/layout/PageWrapper';
 
 import { calculateIndex, getColumnWidth } from '@utils';
 
+// Định nghĩa status constants
+const STATUS_ACTIVE = 1;
+const STATUS_WAITING_APPROVE = 2;
+const STATUS_REJECT = -2;
+
 const EducatorListPage = ({ pageOptions }) => {
     const translate = useTranslate();
     const navigate = useNavigate();
+    const notificationApi = useNotification();
 
     const formattedStatusOptions = translate.formatKeys(educatorStatusOptions, ['label']);
     const statusMap = Object.fromEntries(
@@ -40,12 +44,10 @@ const EducatorListPage = ({ pageOptions }) => {
         email:          translate.formatMessage(commonMessage.email),
         phone:          translate.formatMessage(commonMessage.phone),
         avatar:         translate.formatMessage(commonMessage.avatar),
-        gender:         translate.formatMessage(commonMessage.gender),
-        birthday:       translate.formatMessage(commonMessage.birthday),
         status:         translate.formatMessage(commonMessage.status),
         noData:         translate.formatMessage(commonMessage.noData),
-        approve:        translate.formatMessage(commonMessage.approve),
-        confirmApprove: translate.formatMessage(commonMessage.confirmApprove),
+        action:         translate.formatMessage(commonMessage.action),
+        educator:       'khoa chuyên môn',
     };
 
     const statusValues = formattedStatusOptions.map(item => ({
@@ -53,30 +55,158 @@ const EducatorListPage = ({ pageOptions }) => {
         label: item.label,
     }));
 
-    const { data, mixinFuncs, queryFilter, loading, pagination } = useListBase({
+    // Khởi tạo hooks cho approve/reject
+    const { execute: executeApprove } = useFetch(apiConfig.educator.approve);
+    const { execute: executeReject } = useFetch(apiConfig.educator.reject);
+
+    const { data, mixinFuncs, queryFilter, loading, pagination, setData, setLoading } = useListBase({
         apiConfig: {
             getList:      apiConfig.educator.getList,
             delete:       apiConfig.educator.delete,
             update:       apiConfig.educator.update,
-            changeStatus: apiConfig.educator.changeStatus,
+            approve:      apiConfig.educator.approve,
+            reject:       apiConfig.educator.reject,
         },
         options: {
-            objectName: 'giáo viên',
+            objectName: labels.educator,
             pageSize:   DEFAULT_TABLE_ITEM_SIZE,
         },
         override: (funcs) => {
-            const statusMap = {
-                1: { label: translate.formatMessage(commonMessage.statusActive), color: '#00A648' },
-                2: { label: translate.formatMessage(commonMessage.statusPending), color: '#FFBF00' },
-                3: { label: translate.formatMessage(commonMessage.statusLock), color: '#CC0000' },
+            // ============ HELPER FUNCTIONS ============
+            const handleApiResponse = (response, successMessage, errorMessage, onSuccess) => {
+                console.log('=== API Response ===');
+                console.log('Full Response:', response);
+                console.log('Result:', response?.result);
+                console.log('Message:', response?.message);
+                console.log('===================');
+
+                const { result, message: apiMessage } = response;
+                if (result === true) {
+                    notificationApi({
+                        type: 'success',
+                        message: apiMessage ? `${successMessage}: ${apiMessage}` : successMessage,
+                    });
+                    onSuccess?.();
+                } else {
+                    notificationApi({
+                        type: 'error',
+                        message: apiMessage || errorMessage,
+                    });
+                }
             };
 
-            // ⚠️ Lưu lại hàm gốc tránh đệ quy vô hạn
-            const originalActionColumnButtons = funcs.actionColumnButtons;
+            const handleApiError = (error, defaultMessage) => {
+                console.log('=== API Error Details ===');
+                console.log('Full Error:', error);
+                console.log('Response Data:', error?.response?.data);
+                console.log('Status:', error?.response?.status);
+                console.log('========================');
 
-            // ✅ Ghi đè hàm renderStatusColumn
+                const errorMessage = error?.response?.data?.message || error.message || defaultMessage;
+                notificationApi({
+                    type: 'error',
+                    message: errorMessage,
+                });
+            };
+
+            // ============ APPROVE FUNCTION ============
+            funcs.handleApprove = (id) => {
+                if (!apiConfig.educator.approve || !id) return;
+
+                Modal.confirm({
+                    title: 'Xác nhận phê duyệt',
+                    content: `Bạn có chắc chắn muốn phê duyệt ${labels.educator} này?`,
+                    okText: 'Xác nhận',
+                    cancelText: 'Hủy',
+                    onOk: () => {
+                        setLoading(true);
+
+                        executeApprove({
+                            data: { id },
+                            onCompleted: (response) => {
+                                handleApiResponse(
+                                    response,
+                                    `Phê duyệt ${labels.educator} thành công`,
+                                    `Phê duyệt ${labels.educator} thất bại`,
+                                    () => {
+                                        // Cập nhật status thành ACTIVE
+                                        setData((prevData) =>
+                                            prevData.map((item) =>
+                                                item.id === id 
+                                                    ? { 
+                                                        ...item, 
+                                                        account: { 
+                                                            ...item.account, 
+                                                            status: STATUS_ACTIVE, 
+                                                        }, 
+                                                    } 
+                                                    : item,
+                                            ),
+                                        );
+                                    },
+                                );
+                                setLoading(false);
+                            },
+                            onError: (error) => {
+                                handleApiError(error, 'Có lỗi xảy ra khi phê duyệt');
+                                setLoading(false);
+                            },
+                        });
+                    },
+                });
+            };
+
+            // ============ REJECT FUNCTION ============
+            funcs.handleReject = (id) => {
+                if (!apiConfig.educator.reject || !id) return;
+
+                Modal.confirm({
+                    title: 'Xác nhận từ chối',
+                    content: `Bạn có chắc chắn muốn từ chối ${labels.educator} này?`,
+                    okText: 'Xác nhận',
+                    cancelText: 'Hủy',
+                    okButtonProps: { danger: true },
+                    onOk: () => {
+                        setLoading(true);
+
+                        executeReject({
+                            data: { id },
+                            onCompleted: (response) => {
+                                handleApiResponse(
+                                    response,
+                                    `Từ chối ${labels.educator} thành công`,
+                                    `Từ chối ${labels.educator} thất bại`,
+                                    () => {
+                                        // Cập nhật status thành REJECT
+                                        setData((prevData) =>
+                                            prevData.map((item) =>
+                                                item.id === id 
+                                                    ? { 
+                                                        ...item, 
+                                                        account: { 
+                                                            ...item.account, 
+                                                            status: STATUS_REJECT, 
+                                                        }, 
+                                                    } 
+                                                    : item,
+                                            ),
+                                        );
+                                    },
+                                );
+                                setLoading(false);
+                            },
+                            onError: (error) => {
+                                handleApiError(error, 'Có lỗi xảy ra khi từ chối');
+                                setLoading(false);
+                            },
+                        });
+                    },
+                });
+            };
+
+            // ============ STATUS COLUMN ============
             funcs.renderStatusColumn = (columnsProps) => ({
-                title: translate.formatMessage(commonMessage.status),
+                title: labels.status,
                 dataIndex: ['account', 'status'],
                 align: 'center',
                 ...columnsProps,
@@ -90,33 +220,46 @@ const EducatorListPage = ({ pageOptions }) => {
                 },
             });
 
-            // ✅ Ghi đè nút hành động changeStatus với confirm tuỳ biến
-            funcs.actionColumnButtons = (additionalButtons = {}) => ({
-                ...originalActionColumnButtons(additionalButtons),
-                changeStatus: ({ id, status, ...record }) => {
-                    if (record.account?.status !== 2) return null;
+            // ============ ACTION BUTTONS ============
+            const originalActionColumnButtons = funcs.actionColumnButtons;
+            funcs.actionColumnButtons = (additionalButtons = {}) => {
+                const buttons = {
+                    ...originalActionColumnButtons(additionalButtons),
+                    // Nút Approve
+                    approve: ({ id, account, buttonProps }) =>
+                        account?.status === STATUS_WAITING_APPROVE ? (
+                            <Button
+                                type="link"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    funcs.handleApprove(id);
+                                }}
+                                title="Phê duyệt"
+                                {...buttonProps}
+                            >
+                                <CheckCircleOutlined />
+                            </Button>
+                        ) : null,
+                    // Nút Reject
+                    reject: ({ id, account, buttonProps }) =>
+                        account?.status === STATUS_WAITING_APPROVE ? (
+                            <Button
+                                type="link"
+                                danger
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    funcs.handleReject(id);
+                                }}
+                                title="Từ chối"
+                                {...buttonProps}
+                            >
+                                <CloseCircleOutlined />
+                            </Button>
+                        ) : null,
+                };
 
-                    return (
-                        <Button
-                            type="link"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                Modal.confirm({
-                                    title: `Bạn có chắc chắn muốn duyệt khoa chuyên môn "${record?.account?.fullName}" không?`,
-                                    okText: 'Duyệt',
-                                    cancelText: 'Huỷ',
-                                    onOk: () => {
-                                        funcs.handleChangeStatus(id, 1);
-                                    },
-                                });
-                            }}
-                            style={{ padding: 0 }}
-                        >
-                            <CheckOutlined />
-                        </Button>
-                    );
-                },
-            });
+                return buttons;
+            };
 
             funcs.renderActionBar = () => null;
         },
@@ -157,7 +300,6 @@ const EducatorListPage = ({ pageOptions }) => {
             width: labels.phone.length * 10,
         },
         mixinFuncs.renderStatusColumn({ width: '120px' }),
-
         mixinFuncs.renderActionColumn(
             {
                 edit: record =>
@@ -165,12 +307,16 @@ const EducatorListPage = ({ pageOptions }) => {
                 delete: record =>
                     mixinFuncs.hasPermission([apiConfig.educator.delete.permissionCode]) &&
                     !record.isSuperAdmin,
-                changeStatus: record =>
-                    record.account.status === 2,
+                approve: record =>
+                    record.account?.status === STATUS_WAITING_APPROVE &&
+                    mixinFuncs.hasPermission([apiConfig.educator.approve?.permissionCode]),
+                reject: record =>
+                    record.account?.status === STATUS_WAITING_APPROVE &&
+                    mixinFuncs.hasPermission([apiConfig.educator.reject?.permissionCode]),
             },
             {
-                width: '140px',
-                title: labels.approve,
+                width: '180px',
+                title: labels.action,
             },
         ),
     ];

@@ -13,10 +13,12 @@ import useBasicForm from '@hooks/useBasicForm';
 import useFetch from '@hooks/useFetch';
 import useTranslate from '@hooks/useTranslate';
 
-import { AppConstants, TaskTypes } from '@constants';
+import { AppConstants, TaskTypes, UserTypes } from '@constants';
 import apiConfig from '@constants/apiConfig';
 import { taskKindOptions } from '@constants/masterData';
 import { commonMessage } from '@locales/intl';
+import { getData } from '@utils/localStorage';
+import { storageKeys } from '@constants';
 
 const { Panel } = Collapse;
 
@@ -26,6 +28,10 @@ const TaskForm = (props) => {
     const location = useLocation();
     
     const parentTaskFromState = location.state?.parentTask;
+
+    // ✅ Thêm permission check
+    const userType = getData(storageKeys.USER_TYPE);
+    const canEdit = userType === UserTypes.EDUCATOR;
 
     const {
         formId,
@@ -37,11 +43,11 @@ const TaskForm = (props) => {
         simulationId,
     } = props;
 
-    const { execute: executeUpFile } = useFetch(apiConfig.file.upload);
+    const { execute: executeUpFile } = useFetch(apiConfig.file.upload, { immediate: false });
     const { execute: getTaskList } = useFetch(apiConfig.task.getList);
     
     const [imagePath, setImagePath] = useState(null);
-    const [videoPath, setVideoPath] = useState(null);
+    const [videoUrl, setVideoUrl] = useState(''); // ✅ Đổi tên từ videoPath sang videoUrl
     const [filePath, setFilePath] = useState(null);
     const [taskKind, setTaskKind] = useState(null);
     const [previewVisible, setPreviewVisible] = useState(false);
@@ -136,15 +142,17 @@ const TaskForm = (props) => {
         }
     }, [taskKind, isEditing, autoNameGenerated]);
 
-    const uploadFile = (file, onSuccess, onError, type = 'AVATAR') => {
+    // ✅ Cập nhật uploadFile function giống SimulationForm
+    const uploadFile = (file, onSuccess, onError, type) => {
         executeUpFile({
-            data: { type, file },
+            data: { file, type },
             onCompleted: (response) => {
                 if (response.result === true) {
                     onSuccess();
-                    if (type === 'AVATAR') setImagePath(response.data.filePath);
-                    else if (type === 'VIDEO') setVideoPath(response.data.filePath);
-                    else setFilePath(response.data.filePath);
+                    if (type === 'IMAGE') {
+                        setImagePath(response.data.filePath);
+                        form.setFieldsValue({ imagePath: response.data.filePath });
+                    }
                     setIsChangedFormValues(true);
                 }
             },
@@ -175,14 +183,13 @@ const TaskForm = (props) => {
             section => section.title.trim() !== '' || (section.content && section.content !== '<p><br></p>'),
         );
         
-        // Content is already in HTML format from ReactQuill
         return validSections.map(section => ({
             title: section.title.trim(),
             content: section.content || '',
         }));
     };
 
-    const handleSubmit = async (values) => {  // ← Thêm async ở đây!
+    const handleSubmit = async (values) => {
         try {
             setSubmitError(null);
             const normalizedIntroduction = normalizeIntroduction(introductionSections);
@@ -196,13 +203,12 @@ const TaskForm = (props) => {
             let submitData = {
                 name: taskName,
                 title: values.title?.trim() || '',
-                description: values.description?.trim() || '',
-                content: values.content?.trim() || null,
+                description: values.description?.trim() || ' ',
                 kind: isEditing ? dataDetail.kind : taskKind,
                 simulationId: simulationId || 0,
                 introduction: introductionJson,
                 imagePath: imagePath || null,
-                videoPath: videoPath || null,
+                videoPath: videoUrl || null, // ✅ Dùng videoUrl
                 filePath: filePath || null,
             };
 
@@ -248,7 +254,7 @@ const TaskForm = (props) => {
         return {
             ...formValues,
             imagePath,
-            videoPath,
+            videoPath: videoUrl, // ✅ Dùng videoUrl
             filePath,
             introduction: normalizeIntroduction(introductionSections),
             kind: kindValues.find(k => k.value === currentKind),
@@ -259,51 +265,68 @@ const TaskForm = (props) => {
     };
 
     const parseIntroduction = (introData) => {
-        if (!introData) return [{ title: '', content: '' }];
+        console.log('🔍 parseIntroduction called with:', introData);
+        
+        if (!introData) {
+            console.log('⚠️ No introduction data');
+            return [{ title: '', content: '' }];
+        }
         
         try {
-            const parsed = typeof introData === 'string' 
-                ? JSON.parse(introData) 
-                : introData;
+            let parsed;
+            
+            if (typeof introData === 'string') {
+                console.log('📝 Parsing string introduction');
+                parsed = JSON.parse(introData);
+            } else {
+                parsed = introData;
+            }
+            
+            console.log('✅ Parsed introduction:', parsed);
             
             if (!Array.isArray(parsed)) {
-                console.warn('⚠️ Introduction is not an array');
-                message.warning('Dữ liệu giới thiệu không đúng định dạng');
+                console.warn('⚠️ Introduction is not an array:', typeof parsed);
                 return [{ title: '', content: '' }];
             }
             
-            // Content is already in HTML format, no conversion needed
-            const validParsed = parsed.filter(
-                item => item && typeof item === 'object' && 'title' in item && 'content' in item,
-            ).map(item => ({
-                title: item.title || '',
-                content: item.content || '',
-            }));
+            const validParsed = parsed
+                .filter(item => item && typeof item === 'object' && 'title' in item && 'content' in item)
+                .map(item => ({
+                    title: item.title || '',
+                    content: item.content || '',
+                }));
+            
+            console.log('✅ Valid parsed sections:', validParsed);
             
             return validParsed.length > 0 ? validParsed : [{ title: '', content: '' }];
         } catch (e) {
             console.error('❌ Error parsing introduction:', e);
+            console.error('❌ Raw data:', introData);
             message.error('Không thể đọc dữ liệu giới thiệu. Dữ liệu có thể bị lỗi.');
             return [{ title: '', content: '' }];
         }
     };
 
     useEffect(() => {
+        console.log('🔄 useEffect for dataDetail triggered');
+        console.log('📦 dataDetail:', dataDetail);
+        
         if (dataDetail && Object.keys(dataDetail).length > 0) {
             try {
                 form.setFieldsValue({
                     name: dataDetail?.name || '',
                     title: dataDetail?.title || '',
                     description: dataDetail?.description || '',
-                    content: dataDetail?.content || '',
                 });
                 
                 setImagePath(dataDetail?.imagePath || '');
-                setVideoPath(dataDetail?.videoPath || '');
+                setVideoUrl(dataDetail?.videoPath || ''); // ✅ Load videoUrl
                 setFilePath(dataDetail?.filePath || '');
                 setAutoNameGenerated(true);
 
+                console.log('📚 Raw introduction from API:', dataDetail?.introduction);
                 const parsedIntro = parseIntroduction(dataDetail?.introduction);
+                console.log('✅ Setting introduction sections:', parsedIntro);
                 setIntroductionSections(parsedIntro);
             } catch (error) {
                 console.error('❌ Error loading task detail:', error);
@@ -333,6 +356,18 @@ const TaskForm = (props) => {
                             style={{ marginBottom: 16 }}
                         />
                     )}
+
+                    {/* ✅ Thêm thông báo nếu không có quyền edit */}
+                    {!canEdit && (
+                        <Alert
+                            message="Chế độ xem"
+                            description="Bạn không có quyền chỉnh sửa. Chỉ EDUCATOR mới có thể chỉnh sửa Task."
+                            type="info"
+                            showIcon
+                            style={{ marginBottom: 16 }}
+                        />
+                    )}
+
                     <Row gutter={16} style={{ marginBottom: 16 }}>
                         <Col span={24}>
                             <Alert
@@ -369,7 +404,7 @@ const TaskForm = (props) => {
                                         ? "Tự động điền theo tên Task cha"
                                         : "Tự động điền: Nhiệm vụ 1, 2, 3..."
                                 }
-                                disabled={taskKind === TaskTypes.SUBTASK}
+                                disabled={taskKind === TaskTypes.SUBTASK || !canEdit}
                             />
                         </Col>
                         <Col span={12}>
@@ -379,6 +414,7 @@ const TaskForm = (props) => {
                                 name="title"
                                 requiredMsg={translate.formatMessage(commonMessage.required)}
                                 placeholder="Tiêu đề nhiệm vụ"
+                                disabled={!canEdit}
                             />
                         </Col>
                     </Row>
@@ -392,18 +428,7 @@ const TaskForm = (props) => {
                                 type="textarea"
                                 rows={3}
                                 placeholder="Mô tả ngắn gọn về nhiệm vụ"
-                            />
-                        </Col>
-                    </Row>
-
-                    <Row gutter={16}>
-                        <Col span={24}>
-                            <TextField
-                                label="Nội dung chi tiết"
-                                name="content"
-                                type="textarea"
-                                rows={5}
-                                placeholder="Nhập nội dung chi tiết của nhiệm vụ (tùy chọn)"
+                                disabled={!canEdit}
                             />
                         </Col>
                     </Row>
@@ -416,7 +441,7 @@ const TaskForm = (props) => {
                             size="small"
                             style={{ marginBottom: 16, background: '#fafafa' }}
                             extra={
-                                introductionSections.length > 1 && (
+                                introductionSections.length > 1 && canEdit && (
                                     <Button
                                         type="text"
                                         danger
@@ -440,6 +465,7 @@ const TaskForm = (props) => {
                                             value={section.title}
                                             onChange={(e) => updateIntroductionSection(index, 'title', e.target.value)}
                                             size="large"
+                                            disabled={!canEdit}
                                         />
                                     </div>
                                 </Col>
@@ -458,6 +484,7 @@ const TaskForm = (props) => {
                                             modules={quillModules}
                                             formats={quillFormats}
                                             placeholder="Nhập nội dung chi tiết, sử dụng toolbar để format..."
+                                            readOnly={!canEdit}
                                             style={{ 
                                                 background: 'white',
                                                 borderRadius: '4px',
@@ -473,55 +500,82 @@ const TaskForm = (props) => {
                         </Card>
                     ))}
 
-                    <Row>
-                        <Col span={24}>
-                            <Button
-                                type="dashed"
-                                onClick={addIntroductionSection}
-                                block
-                                icon={<PlusOutlined />}
-                                style={{ marginBottom: 16 }}
-                            >
-                                Thêm phần giới thiệu
-                            </Button>
-                        </Col>
-                    </Row>
+                    {canEdit && (
+                        <Row>
+                            <Col span={24}>
+                                <Button
+                                    type="dashed"
+                                    onClick={addIntroductionSection}
+                                    block
+                                    icon={<PlusOutlined />}
+                                    style={{ marginBottom: 16 }}
+                                >
+                                    Thêm phần giới thiệu
+                                </Button>
+                            </Col>
+                        </Row>
+                    )}
 
                     <Divider orientation="left">Media & Files</Divider>
 
                     <Row gutter={16}>
                         <Col span={8}>
+                            {/* ✅ Cập nhật CropImageField với aspect và type IMAGE */}
                             <CropImageField
-                                label="Hình ảnh"
+                                label={translate.formatMessage(commonMessage.image)}
                                 name="imagePath"
                                 imageUrl={imagePath && `${AppConstants.contentRootUrl}${imagePath}`}
                                 aspect={16 / 9}
-                                uploadFile={(file, onSuccess, onError) => uploadFile(file, onSuccess, onError, 'AVATAR')}
+                                uploadFile={(file, onSuccess, onError) =>
+                                    uploadFile(file, onSuccess, onError, 'IMAGE')
+                                }
+                                disabled={!canEdit}
                             />
                         </Col>
                         <Col span={8}>
-                            <TextField
-                                label="Video URL"
-                                name="videoPathInput"
-                                placeholder="URL video"
-                                value={videoPath}
-                                onChange={(e) => {
-                                    setVideoPath(e.target.value);
-                                    setIsChangedFormValues(true);
-                                }}
-                            />
+                            {/* ✅ Cập nhật Video URL field */}
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
+                                    Video URL
+                                </label>
+                                <Input
+                                    value={videoUrl}
+                                    onChange={(e) => {
+                                        setVideoUrl(e.target.value);
+                                        setIsChangedFormValues(true);
+                                    }}
+                                    placeholder="Nhập URL hoặc mã embed video (YouTube, Vimeo, etc.)"
+                                    size="large"
+                                    disabled={!canEdit}
+                                />
+                                {videoUrl && (
+                                    <div style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
+                                        📹 Video: {videoUrl}
+                                    </div>
+                                )}
+                            </div>
                         </Col>
                         <Col span={8}>
-                            <TextField
-                                label="File URL"
-                                name="filePathInput"
-                                placeholder="URL file"
-                                value={filePath}
-                                onChange={(e) => {
-                                    setFilePath(e.target.value);
-                                    setIsChangedFormValues(true);
-                                }}
-                            />
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
+                                    File URL
+                                </label>
+                                <Input
+                                    value={filePath}
+                                    onChange={(e) => {
+                                        setFilePath(e.target.value);
+                                        setIsChangedFormValues(true);
+                                    }}
+                                    placeholder="Nhập URL file tài liệu"
+                                    size="large"
+                                    disabled={!canEdit}
+                                />
+                                {filePath && (
+                                    <div style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
+                                        📄 File: {filePath}
+                                    </div>
+                                )}
+                            </div>
                         </Col>
                     </Row>
 
@@ -530,10 +584,12 @@ const TaskForm = (props) => {
                             <Button
                                 icon={<EyeOutlined />}
                                 onClick={() => setPreviewVisible(true)}
+                                type="default"
+                                size="large"
                             >
                                 Xem trước
                             </Button>
-                            {actions}
+                            {canEdit && actions}
                         </Space>
                     </div>
                 </Card>

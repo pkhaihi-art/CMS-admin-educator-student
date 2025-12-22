@@ -243,20 +243,20 @@ const TaskListPage = ({ pageOptions }) => {
                 return '';
             },
         },
-        {
-            title: labels.image,
-            dataIndex: 'imagePath',
-            align: 'center',
-            width: '80px',
-            render: imagePath => (
-                <AvatarField
-                    size="large"
-                    icon={<FileTextOutlined />}
-                    src={imagePath ? `${AppConstants.contentRootUrl}${imagePath}` : null}
-                    shape="square"
-                />
-            ),
-        },
+        // {
+        //     title: labels.image,
+        //     dataIndex: 'imagePath',
+        //     align: 'center',
+        //     width: '80px',
+        //     render: imagePath => (
+        //         <AvatarField
+        //             size="large"
+        //             icon={<FileTextOutlined />}
+        //             src={imagePath ? `${AppConstants.contentRootUrl}${imagePath}` : null}
+        //             shape="square"
+        //         />
+        //     ),
+        // },
         {
             title: labels.name,
             dataIndex: 'name',

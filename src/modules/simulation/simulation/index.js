@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Empty, Tag, Button, Modal, Input } from 'antd';
-import { AppstoreOutlined, UnorderedListOutlined, CheckCircleOutlined, DeleteOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, UnorderedListOutlined, CheckCircleOutlined, DeleteOutlined, CloseCircleOutlined, BellOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import useListBase from '@hooks/useListBase';
 import useFetch from '@hooks/useFetch';
@@ -35,11 +35,14 @@ const SimulationListPage = ({ pageOptions }) => {
     const navigate = useNavigate();
     const notificationApi = useNotification();
     
-    // State cho Modal
-    const [isApproveModalVisible, setIsApproveModalVisible] = useState(false);
+    // State cho Modal - chỉ còn Reject
     const [isRejectModalVisible, setIsRejectModalVisible] = useState(false);
     const [currentRecordId, setCurrentRecordId] = useState(null);
     const [noticeText, setNoticeText] = useState('');
+    
+    // State cho Modal xem thông báo
+    const [isNoticeModalVisible, setIsNoticeModalVisible] = useState(false);
+    const [currentNotice, setCurrentNotice] = useState('');
 
     // Tự động phát hiện user type
     const userType = getData(storageKeys.USER_TYPE);
@@ -74,6 +77,12 @@ const SimulationListPage = ({ pageOptions }) => {
     const { execute: executeRejectDelete } = useFetch(apiConfig.simulation.rejectDelete);
     const { execute: executeRequestDelete } = useFetch(apiConfig.simulation.requestDelete);
     const { execute: executeEducatorDelete } = useFetch(apiConfig.simulation.educatorDelete);
+
+    // Hàm mở modal xem thông báo
+    const showNoticeModal = (notice) => {
+        setCurrentNotice(notice);
+        setIsNoticeModalVisible(true);
+    };
 
     // Cấu hình API theo role
     const apiConfiguration = isEducator
@@ -163,13 +172,6 @@ const SimulationListPage = ({ pageOptions }) => {
 
             // ============ ADMIN FUNCTIONS ============
             if (!isEducator) {
-                // Mở modal để nhập notice khi Approve
-                funcs.showApproveModal = (id) => {
-                    setCurrentRecordId(id);
-                    setNoticeText('');
-                    setIsApproveModalVisible(true);
-                };
-
                 // Mở modal để nhập notice khi Reject
                 funcs.showRejectModal = (id) => {
                     setCurrentRecordId(id);
@@ -178,31 +180,38 @@ const SimulationListPage = ({ pageOptions }) => {
                 };
 
                 /**
-                 * Xử lý phê duyệt simulation
+                 * Xử lý phê duyệt simulation - KHÔNG CẦN MODAL
                  */
-                funcs.handleApprove = () => {
-                    if (!apiConfig.simulation.approve || !currentRecordId) return;
+                funcs.handleApprove = (id) => {
+                    if (!apiConfig.simulation.approve || !id) return;
 
-                    setLoading(true);
-                    setIsApproveModalVisible(false);
+                    Modal.confirm({
+                        title: 'Xác nhận phê duyệt',
+                        content: `Bạn có chắc chắn muốn phê duyệt ${labels.simulation} này?`,
+                        okText: 'Xác nhận',
+                        cancelText: 'Hủy',
+                        onOk: () => {
+                            setLoading(true);
 
-                    executeApprove({
-                        data: {
-                            id: currentRecordId,
-                            notice: noticeText.trim() || ' ',
-                        },
-                        onCompleted: (response) => {
-                            handleApiResponse(
-                                response,
-                                `Phê duyệt ${labels.simulation} thành công`,
-                                `Phê duyệt ${labels.simulation} thất bại`,
-                                () => mixinFuncs.getList(),
-                            );
-                            resetModalState();
-                        },
-                        onError: (error) => {
-                            handleApiError(error, 'Có lỗi xảy ra khi phê duyệt');
-                            resetModalState();
+                            executeApprove({
+                                data: {
+                                    id: id,
+                                    notice: ' ',
+                                },
+                                onCompleted: (response) => {
+                                    handleApiResponse(
+                                        response,
+                                        `Phê duyệt ${labels.simulation} thành công`,
+                                        `Phê duyệt ${labels.simulation} thất bại`,
+                                        () => mixinFuncs.getList(),
+                                    );
+                                    setLoading(false);
+                                },
+                                onError: (error) => {
+                                    handleApiError(error, 'Có lỗi xảy ra khi phê duyệt');
+                                    setLoading(false);
+                                },
+                            });
                         },
                     });
                 };
@@ -418,6 +427,20 @@ const SimulationListPage = ({ pageOptions }) => {
                             <AppstoreOutlined />
                         </Button>
                     ),
+                    // Nút xem thông báo - hiển thị khi có notice
+                    viewNotice: ({ notice }) =>
+                        notice && notice.trim() ? (
+                            <Button
+                                type="link"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    showNoticeModal(notice);
+                                }}
+                                title="Xem thông báo"
+                            >
+                                <BellOutlined />
+                            </Button>
+                        ) : null,
                 };
 
                 if (isEducator) {
@@ -455,14 +478,14 @@ const SimulationListPage = ({ pageOptions }) => {
                             </Button>
                         ) : null;
                 } else {
-                    // Nút Approve cho Admin
+                    // Nút Approve cho Admin - không cần modal
                     buttons.approve = ({ id, status, buttonProps }) =>
                         status === STATUS_WAITING_APPROVE ? (
                             <Button
                                 type="link"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    funcs.showApproveModal(id);
+                                    funcs.handleApprove(id);
                                 }}
                                 title="Phê duyệt"
                                 {...buttonProps}
@@ -596,6 +619,7 @@ const SimulationListPage = ({ pageOptions }) => {
         mixinFuncs.renderActionColumn(
             isEducator
                 ? {
+                    viewNotice: (dataRow) => dataRow.notice && dataRow.notice.trim(),
                     edit: (dataRow) => dataRow.status !== STATUS_WAITING_APPROVE_DELETE && mixinFuncs.hasPermission([apiConfig.simulation.update.permissionCode]),
                     task: () => mixinFuncs.hasPermission([apiConfig.task.educatorList.permissionCode]),
                     educatorDelete: (dataRow) =>
@@ -607,6 +631,7 @@ const SimulationListPage = ({ pageOptions }) => {
                           mixinFuncs.hasPermission([apiConfig.simulation.requestDelete.permissionCode]),
                 }
                 : {
+                    viewNotice: (dataRow) => dataRow.notice && dataRow.notice.trim(),
                     edit: () => mixinFuncs.hasPermission([apiConfig.simulation.update.permissionCode]),
                     task: () => mixinFuncs.hasPermission([apiConfig.task.getList.permissionCode]),
                     approve: (dataRow) => dataRow.status === STATUS_WAITING_APPROVE,
@@ -614,7 +639,7 @@ const SimulationListPage = ({ pageOptions }) => {
                     approveDelete: (dataRow) => dataRow.status === STATUS_WAITING_APPROVE_DELETE,
                     rejectDelete: (dataRow) => dataRow.status === STATUS_WAITING_APPROVE_DELETE,
                 },
-            { width: isEducator ? '150px' : '220px', title: labels.action },
+            { width: '237px', title: labels.action },
         ),
     ];
 
@@ -661,28 +686,6 @@ const SimulationListPage = ({ pageOptions }) => {
                 }
             />
 
-            {/* Modal Phê duyệt */}
-            <Modal
-                title="Phê duyệt đăng"
-                open={isApproveModalVisible}
-                onOk={mixinFuncs.handleApprove}
-                onCancel={() => {
-                    setIsApproveModalVisible(false);
-                    setNoticeText('');
-                    setCurrentRecordId(null);
-                }}
-                okText="Xác nhận"
-                cancelText="Hủy"
-            >
-                <div style={{ marginBottom: 8 }}>Thông báo (tùy chọn):</div>
-                <TextArea
-                    rows={4}
-                    placeholder="Nhập thông báo gửi đến người tạo..."
-                    value={noticeText}
-                    onChange={(e) => setNoticeText(e.target.value)}
-                />
-            </Modal>
-
             {/* Modal Từ chối */}
             <Modal
                 title="Từ chối đăng"
@@ -704,6 +707,28 @@ const SimulationListPage = ({ pageOptions }) => {
                     value={noticeText}
                     onChange={(e) => setNoticeText(e.target.value)}
                 />
+            </Modal>
+
+            {/* Modal Xem thông báo */}
+            <Modal
+                title="Thông báo từ chối duyệt của Quản trị viên"
+                open={isNoticeModalVisible}
+                onCancel={() => {
+                    setIsNoticeModalVisible(false);
+                    setCurrentNotice('');
+                }}
+                footer={[
+                    <Button key="close" type="primary" onClick={() => {
+                        setIsNoticeModalVisible(false);
+                        setCurrentNotice('');
+                    }}>
+                        Đóng
+                    </Button>,
+                ]}
+            >
+                <div style={{ padding: '12px 0', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+                    {currentNotice || 'Không có thông báo'}
+                </div>
             </Modal>
         </PageWrapper>
     );

@@ -96,47 +96,64 @@ const TaskQuestionListPage = ({ pageOptions }) => {
     });
 
     const parseOptions = (optionsStr) => {
+        // Xử lý trường hợp null hoặc undefined
+        if (!optionsStr || optionsStr === 'null' || optionsStr === 'undefined') {
+            return <span style={{ color: '#999' }}>-</span>;
+        }
+
         try {
             // Nếu optionsStr đã là object/array, không cần parse
             let options = typeof optionsStr === 'string' ? JSON.parse(optionsStr) : optionsStr;
             
-            if (Array.isArray(options)) {
-                return options.map((opt, idx) => {
-                    // Xử lý trường hợp opt là object
-                    let content = '';
-                    let isCorrect = false;
+            if (Array.isArray(options) && options.length > 0) {
+                return (
+                    <div>
+                        {options.map((opt, idx) => {
+                            // Xử lý trường hợp opt là object
+                            let content = '';
+                            let isCorrect = false;
 
-                    if (typeof opt === 'object' && opt !== null) {
-                        // Lấy content từ các key có thể có
-                        content = opt.content || opt.text || opt.option || opt.answer || JSON.stringify(opt);
-                        isCorrect = opt.isCorrect || false;
-                    } else {
-                        // Nếu opt là string hoặc number
-                        content = String(opt);
-                    }
+                            if (typeof opt === 'object' && opt !== null) {
+                                // Lấy content từ các key có thể có
+                                content = opt.content || opt.text || opt.option || '';
+                                // Kiểm tra answer hoặc isCorrect
+                                isCorrect = opt.answer === true || opt.isCorrect === true;
+                            } else {
+                                // Nếu opt là string hoặc number
+                                content = String(opt);
+                            }
 
-                    return (
-                        <div key={idx} style={{ marginBottom: 2 }}>
-                            <Tag color={isCorrect ? 'green' : 'default'}>
-                                {content}
-                            </Tag>
-                        </div>
-                    );
-                });
+                            // Không hiển thị nếu content rỗng
+                            if (!content) return null;
+
+                            return (
+                                <div key={idx} style={{ marginBottom: 4 }}>
+                                    <Tag 
+                                        color={isCorrect ? 'success' : 'default'}
+                                        style={{ 
+                                            padding: '2px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                        }}
+                                    >
+                                        {isCorrect && <span style={{ marginRight: 4 }}>✓</span>}
+                                        {content}
+                                    </Tag>
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
             }
             
-            // Nếu options là object (không phải array)
-            if (typeof options === 'object' && options !== null) {
-                return JSON.stringify(options);
-            }
-            
-            // Fallback: return as string
-            return String(optionsStr);
+            // Nếu options rỗng hoặc không phải array
+            return <span style={{ color: '#999' }}>-</span>;
         } catch (error) {
             console.error('Error parsing options:', error);
-            return String(optionsStr);
+            return <span style={{ color: '#999' }}>-</span>;
         }
     };
+
     const columns = [
         {
             title: '#',

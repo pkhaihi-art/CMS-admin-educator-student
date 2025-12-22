@@ -14,11 +14,6 @@ export const commonButton = defineMessages({
     login: 'Login',
 });
 
-export const nationKindMessage = defineMessages({
-    province: 'Province',
-    district: 'District',
-    village: 'Village',
-});
 export const actionMessage = defineMessages({
     contactForm: 'Biểu mẫu liên hệ',
     navigation: 'Chuyển hướng',
